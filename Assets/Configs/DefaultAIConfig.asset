@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+AIConfig:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DefaultAIConfig
+  raiseProbability: 0.12
+  betProbability: 0.06
+  raiseSizeBase: 0.5
+  raiseSizeAggressionScale: 1.0
+  minRaiseFraction: 0.5
+  simIterations: 200
