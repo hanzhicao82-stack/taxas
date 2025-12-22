@@ -28,6 +28,9 @@ public class PokerGame : MonoBehaviour
     /// <summary>界面管理器（可为 null）。</summary>
     public UIManager ui;
 
+    /// <summary>AI 参数配置（可通过 ScriptableObject 在 Inspector 中调整）。</summary>
+    public AIConfig aiConfig;
+
     // 游戏参数
     /// <summary>庄家索引（按钮位置）。每手结束后移动。</summary>
     public int dealerIndex = 0;
@@ -75,6 +78,10 @@ public class PokerGame : MonoBehaviour
 
         foreach (var p in players)
             p.ResetForHand();
+
+        // 为每位玩家分配一个小幅随机的攻击性系数，影响其下注/加注概率与规模，增加行为差异性。
+        foreach (var p in players)
+            p.aggression = UnityEngine.Random.Range(0.2f, 1.5f);
 
         deck = new Deck();
         deck.Shuffle();
@@ -150,7 +157,7 @@ public class PokerGame : MonoBehaviour
             }
             if (winners.Count == 0) continue;
             int share = amount / winners.Count;
-            foreach (var w in winners) { players[w].stack += share; Debug.Log($"Pot({amount}) winner P{w + 1} gets {share}"); }
+            foreach (var w in winners) { players[w].stack += share; Debug.Log($"彩池({amount}) 胜者 P{w + 1} 获得 {share}"); }
         }
 
         // 打印玩家筹码
@@ -223,58 +230,15 @@ public class PokerGame : MonoBehaviour
                 if (p.folded || p.allIn) continue;
 
                 int need = currentBet - p.currentBet;
-                if (need > 0)
-                {
-                    // 需要跟注或全下或弃牌
-                    if (p.stack <= need)
-                    {
-                        // 不足以跟注 -> 全下
-                        p.currentBet += p.stack;
-                        p.stack = 0;
-                        p.allIn = true;
-                        changed = true;
-                        Debug.Log($"P{p.id + 1} all-in with {p.currentBet}");
-                    }
-                    else
-                    {
-                        // 简单策略：多数时候跟注，有小概率加注
-                        if (UnityEngine.Random.value < 0.12f && p.stack > need + bigBlindAmount)
-                        {
-                            int raise = bigBlindAmount; // 固定加注大小为大盲
-                            p.stack -= (need + raise);
-                            p.currentBet += (need + raise);
-                            currentBet = p.currentBet;
-                            changed = true;
-                            Debug.Log($"P{p.id + 1} raises by {raise}, new currentBet={currentBet}");
-                        }
-                        else
-                        {
-                            p.stack -= need; p.currentBet += need; changed = true; Debug.Log($"P{p.id + 1} calls {need}");
-                        }
-                    }
-                }
-                else
-                {
-                    // 已满足当前注额：可以 check 或主动下注/加注
-                    if (p.stack > 0 && UnityEngine.Random.value < 0.06f)
-                    {
-                        int bet = Mathf.Min(bigBlindAmount, p.stack);
-                        p.stack -= bet; p.currentBet += bet; currentBet = p.currentBet; changed = true; Debug.Log($"P{p.id + 1} bets {bet}");
-                    }
-                    else
-                    {
-                        // 检查（check）
-                        Debug.Log($"P{p.id + 1} checks");
-                    }
-                }
+                // Delegate AI decision to PlayerAI; it returns true when the betting state changed.
+                if (PlayerAI.Act(p, this, need)) changed = true;
             }
         }
 
-        // 完成一轮下注后，构建边池并重置 players.currentBet
-        var pots = CollectPots();
-        // 将这些中间 pot 的金额加入显示总 pot（实际分配在摊牌时）
-        pot = pots.Sum(p => p.amount);
-        Debug.Log($"Betting round complete. Pot(total)={pot}");
+        // 完成一轮下注后：不要在每轮都调用 CollectPots()（那会清空 players.currentBet）。
+        // 保留 players.currentBet 以跨轮累积，最终在摊牌时一次性调用 CollectPots() 结算。
+        pot = players.Sum(p => p.currentBet);
+        Debug.Log($"下注轮结束。已投入彩池={pot}");
     }
 
     /// <summary>
