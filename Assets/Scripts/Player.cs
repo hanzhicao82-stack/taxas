@@ -39,6 +39,10 @@ public class Player
     /// <summary>是否仍然处于活动状态（例如用于标记被移除或站起等情况）。</summary>
     public bool active = true;
 
+    /// <summary>玩家攻击性系数（影响加注/下注概率与规模），每手可随机分配以产生行为差异。</summary>
+    /// <summary>攻击性（aggression），默认 1.0；>1 更激进，<1 更保守。</summary>
+    public float aggression = 1.0f;
+
     public Player(int id, string name)
     {
         this.id = id;

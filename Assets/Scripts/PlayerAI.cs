@@ -25,7 +25,7 @@ public static class PlayerAI
         float minRaiseFrac = cfg != null ? cfg.minRaiseFraction : 0.5f;
 
         // Estimate win probability via Monte Carlo (using only known cards: hero hole + community)
-        float winProb = EstimateWinProb(p, game, cfg != null ? cfg.simIterations : 200);
+        float winProb = EstimateWinProb(p, game, cfg != null ? cfg.simIterations : 30);
 
         // Need to call or fold/all-in
         if (need > 0)
@@ -49,7 +49,8 @@ public static class PlayerAI
                 // 调整弃牌阈值：在 Preflop（无公共牌）时放宽阈值；同时依据玩家 aggression 调整（更激进的玩家更少弃牌）
                 float foldFactor = 0.85f;
                 bool isPreflop = (game.community == null || game.community.Count == 0);
-                if (isPreflop) foldFactor *= 0.6f; // 在翻牌前更宽松
+                if (isPreflop)
+                    foldFactor *= 0.3f; // 在翻牌前更宽松
                 foldFactor /= Mathf.Clamp(p.aggression, 0.5f, 2.0f); // aggression 越高，foldFactor 越小（更少弃牌）
                 if (winProb < potOdds * foldFactor)
                 {
@@ -162,7 +163,7 @@ public static class PlayerAI
             long heroScore = HandEvaluator.EvaluateBest(heroAll);
 
             long bestOpp = -1;
-        
+
             var oppScores = new System.Collections.Generic.List<long>();
             for (int o = 0; o < opponents; o++)
             {

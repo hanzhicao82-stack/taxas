@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -14,7 +15,7 @@ public class PokerGameFlowTest : MonoBehaviour
     public int handsToPlay = 10;
     public int numPlayers = 4;
 
-    void Start()
+    IEnumerator Start()
     {
         Debug.Log("PokerGameFlowTest: starting flow test...");
 
@@ -35,16 +36,17 @@ public class PokerGameFlowTest : MonoBehaviour
         int initialTotal = game.players.Sum(p => p.stack);
         Debug.Log($"Initial total chips = {initialTotal}");
 
-        // 运行若干手牌并在每手后检查基本不变量
+        // 运行若干手牌并在每手后检查基本不变量（每手之间让出一帧，避免阻塞主线程）
         for (int h = 0; h < handsToPlay; h++)
         {
-            try
+            // 使用带超时保护的执行，防止任意一手因 AI/逻辑问题卡住整个测试
+            float timeoutSec = 60f; // 超时阈值，可根据需要调整
+            bool completed = false;
+            yield return StartCoroutine(RunWithTimeout(game.StartHandRoutine(), timeoutSec, (ok) => completed = ok));
+
+            if (!completed)
             {
-                game.StartHand();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Exception during hand {h + 1}: {ex}");
+                Debug.LogError($"[ERROR] Hand {h + 1} did not complete within {timeoutSec} seconds (timed out)");
                 break;
             }
 
@@ -55,13 +57,68 @@ public class PokerGameFlowTest : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[OK] After hand {h + 1}: total chips = {total}");
+                Debug.LogWarning($"[OK] After hand {h + 1}: total chips = {total}");
             }
+
+            // 异步点：等待一帧再继续下一手（在 Play 模式下非阻塞）
+            yield return null;
         }
 
-        Debug.Log("PokerGameFlowTest: finished");
+        Debug.LogWarning("PokerGameFlowTest: finished");
 
         // 清理运行时创建的对象（保留用于调试可注释掉）
         // Destroy(go);
+    }
+
+    // Helper: run an IEnumerator with a timeout, invoke callback with true if completed, false if timed out
+    private IEnumerator RunWithTimeout(IEnumerator routine, float timeoutSeconds, Action<bool> callback)
+    {
+        var start = Time.realtimeSinceStartup;
+        // Drive the inner routine manually
+        var enumerator = routine;
+        bool moveNext = true;
+        while (true)
+        {
+            if (Time.realtimeSinceStartup - start > timeoutSeconds)
+            {
+                callback?.Invoke(false);
+                yield break;
+            }
+
+            try
+            {
+                moveNext = enumerator.MoveNext();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Exception in inner routine: {ex}");
+                callback?.Invoke(false);
+                yield break;
+            }
+
+            if (!moveNext)
+            {
+                callback?.Invoke(true);
+                yield break;
+            }
+
+            // If the inner yielded an IEnumerator, we should run it to completion before continuing
+            var yielded = enumerator.Current;
+            if (yielded is IEnumerator nested)
+            {
+                yield return StartCoroutine(RunWithTimeout(nested, timeoutSeconds - (Time.realtimeSinceStartup - start), callback));
+                // If nested timed out (callback false) then propagate timeout
+                // Note: callback may have been invoked by nested; check elapsed
+                if (Time.realtimeSinceStartup - start > timeoutSeconds)
+                {
+                    yield break;
+                }
+            }
+            else
+            {
+                // Respect yielded instructions (WaitForSeconds, null, etc.) by yielding it
+                yield return yielded;
+            }
+        }
     }
 }
