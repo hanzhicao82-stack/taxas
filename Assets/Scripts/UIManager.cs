@@ -234,6 +234,27 @@ public class UIManager : MonoBehaviour
         GameEventBus.Subscribe(Events.Turn, onTurnWrapper);
         GameEventBus.Subscribe(Events.River, onRiverWrapper);
         GameEventBus.Subscribe(Events.HandStarted, onHandStartedWrapper);
+        // Ensure we display player chip info if the game creates players slightly later
+        StartCoroutine(EnsureInitialPlayerInfo());
+    }
+
+    private IEnumerator EnsureInitialPlayerInfo()
+    {
+        float start = Time.realtimeSinceStartup;
+        float timeout = 2f;
+        while (Time.realtimeSinceStartup - start < timeout)
+        {
+            if (game != null && game.players != null && game.players.Count > 0)
+            {
+                // rebuild to match actual player count and refresh visible info
+                RebuildPlayerTextFields(game.players.Count, uiFont, uiScale);
+                Refresh(game);
+                yield break;
+            }
+            yield return null;
+        }
+        // final attempt: refresh with what we have
+        Refresh(game);
     }
 
     private IEnumerator FadeInCanvasGroup(CanvasGroup cg, float dur)
