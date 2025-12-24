@@ -248,25 +248,89 @@ public class UIManager : MonoBehaviour
         cg.alpha = 1f;
     }
 
-    // Recreate player text UI elements to match count
+    private IEnumerator MoveRectTo(RectTransform rt, Vector2 target, float dur)
+    {
+        if (rt == null) yield break;
+        Vector2 start = rt.anchoredPosition;
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, t / dur);
+            rt.anchoredPosition = Vector2.Lerp(start, target, k);
+            yield return null;
+        }
+        rt.anchoredPosition = target;
+    }
+
+    private IEnumerator RotateRectTo(RectTransform rt, float targetZ, float dur)
+    {
+        if (rt == null) yield break;
+        float startZ = rt.localEulerAngles.z;
+        // normalize shortest path
+        float delta = Mathf.DeltaAngle(startZ, targetZ);
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, t / dur);
+            float z = startZ + delta * k;
+            var e = rt.localEulerAngles; e.z = z; rt.localEulerAngles = e;
+            yield return null;
+        }
+        var end = rt.localEulerAngles; end.z = targetZ; rt.localEulerAngles = end;
+    }
+
+    private IEnumerator ArrangePlayersSmooth(List<GameObject> gos, float uiScale, float dur)
+    {
+        if (panelRect == null) yield break;
+        int n = gos.Count;
+        float radius = Mathf.Min(panelRect.sizeDelta.x, panelRect.sizeDelta.y) * 0.45f;
+        if (n <= 0) yield break;
+
+        float angleStep = 360f / n;
+        List<Coroutine> running = new List<Coroutine>();
+        for (int i = 0; i < n; i++)
+        {
+            float angleDeg = 90f - i * angleStep;
+            float rad = angleDeg * Mathf.Deg2Rad;
+            var rt = gos[i].GetComponent<RectTransform>();
+            if (rt == null) continue;
+            Vector2 target = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
+
+            // start movement coroutine
+            StartCoroutine(MoveRectTo(rt, target, dur));
+
+            // rotate whole object so card faces center
+            float bgRot = angleDeg - 90f;
+            StartCoroutine(RotateRectTo(rt, bgRot, dur));
+
+            // ensure label upright: set child Label rotation to 0 over same duration
+            var labelTf = rt.transform.Find("Label");
+            if (labelTf != null)
+            {
+                StartCoroutine(RotateRectTo(labelTf.GetComponent<RectTransform>(), 0f, dur));
+            }
+
+            // fade in if needed
+            var cg = rt.GetComponent<CanvasGroup>();
+            if (cg != null) StartCoroutine(FadeInCanvasGroup(cg, dur * 0.8f));
+        }
+        yield return new WaitForSeconds(dur);
+    }
+
+    // Recreate player text UI elements to match count and animate transitions
     private void RebuildPlayerTextFields(int count, Font font, float uiScale)
     {
-        // destroy existing
-        if (playerTextGOs != null)
+        if (playerTextGOs == null) playerTextGOs = new List<GameObject>();
+
+        // create missing elements
+        for (int idx = playerTextGOs.Count; idx < count; idx++)
         {
-            foreach (var go in playerTextGOs)
-            {
-                if (go != null) Destroy(go);
-            }
-            playerTextGOs.Clear();
-        }
-        var list = new List<Text>();
-        for (int i = 0; i < count; i++)
-        {
-            var tgo = new GameObject($"PlayerText_{i + 1}");
+            var tgo = new GameObject($"PlayerText_{idx + 1}");
             tgo.transform.SetParent(panelGO.transform, false);
             var rt = tgo.AddComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(140, 28) * uiScale;
+            rt.sizeDelta = new Vector2(170, 34) * uiScale;
 
             // Background card
             var bgGo = new GameObject("BG");
@@ -284,55 +348,43 @@ public class UIManager : MonoBehaviour
             txtRt.sizeDelta = new Vector2(140, 28) * uiScale;
             var txt = txtGo.AddComponent<Text>();
             txt.font = font; txt.fontSize = Mathf.RoundToInt(14 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.MiddleCenter;
-            txt.text = $"玩家{i + 1}：";
-            list.Add(txt);
+            txt.text = $"玩家{idx + 1}：";
+
+            // start at center
+            var r = tgo.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f); r.pivot = new Vector2(0.5f, 0.5f); r.anchoredPosition = Vector2.zero;
+
+            // initial invisible
+            var cg = tgo.AddComponent<CanvasGroup>(); cg.alpha = 0f;
+
             playerTextGOs.Add(tgo);
         }
-        playerTexts = list.ToArray();
-        // Position player labels in a circle around panel center
-        if (panelRect != null)
+
+        // destroy extras
+        while (playerTextGOs.Count > count)
         {
-            float radius = Mathf.Min(panelRect.sizeDelta.x, panelRect.sizeDelta.y) * 0.45f;
-            int n = count;
-            if (n > 0)
-            {
-                float angleStep = 360f / n;
-                for (int i = 0; i < n; i++)
-                {
-                    float angleDeg = 90f - i * angleStep; // start at top (90 deg) and go clockwise
-                    float rad = angleDeg * Mathf.Deg2Rad;
-                    var rt = playerTextGOs[i].GetComponent<RectTransform>();
-                    if (rt != null)
-                    {
-                        rt.anchorMin = new Vector2(0.5f, 0.5f);
-                        rt.anchorMax = new Vector2(0.5f, 0.5f);
-                        rt.pivot = new Vector2(0.5f, 0.5f);
-                        rt.anchoredPosition = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
-
-                        // rotate background card to face center, keep text upright
-                        var bg = rt.Find("BG");
-                        if (bg != null)
-                        {
-                            var bgRt = bg.GetComponent<RectTransform>();
-                            if (bgRt != null) bgRt.localEulerAngles = new Vector3(0, 0, angleDeg - 90f);
-                        }
-
-                        // fade-in effect
-                        var cg = rt.GetComponent<CanvasGroup>(); if (cg == null) cg = rt.gameObject.AddComponent<CanvasGroup>();
-                        cg.alpha = 0f;
-                        StartCoroutine(FadeInCanvasGroup(cg, 0.25f));
-                    }
-                }
-            }
+            var last = playerTextGOs[playerTextGOs.Count - 1];
+            playerTextGOs.RemoveAt(playerTextGOs.Count - 1);
+            if (last != null) Destroy(last);
         }
 
-        // Ensure community is centered
+        // update label list
+        var labelsList = new List<Text>();
+        for (int j = 0; j < playerTextGOs.Count; j++)
+        {
+            var label = playerTextGOs[j].transform.Find("Label")?.GetComponent<Text>();
+            if (label == null) label = playerTextGOs[j].GetComponentInChildren<Text>();
+            labelsList.Add(label);
+        }
+        playerTexts = labelsList.ToArray();
+
+        // Arrange and animate to circular positions
+        StartCoroutine(ArrangePlayersSmooth(playerTextGOs, uiScale, 0.35f));
+
+        // Ensure community/result/pot/params placed relative to center
         if (communityText != null)
         {
-            var crt2 = communityText.GetComponent<RectTransform>();
-            if (crt2 != null) crt2.anchoredPosition = Vector2.zero;
+            var crt2 = communityText.GetComponent<RectTransform>(); if (crt2 != null) crt2.anchoredPosition = Vector2.zero;
         }
-        // place result and pot under center
         if (resultText != null)
         {
             var rrt2 = resultText.GetComponent<RectTransform>(); if (rrt2 != null) rrt2.anchoredPosition = new Vector2(0, -30 * uiScale);
@@ -341,7 +393,6 @@ public class UIManager : MonoBehaviour
         {
             var prt2 = potText.GetComponent<RectTransform>(); if (prt2 != null) prt2.anchoredPosition = new Vector2(0, -60 * uiScale);
         }
-        // move params container a bit below
         if (paramsContainerGO != null)
         {
             var prt3 = paramsContainerGO.GetComponent<RectTransform>(); if (prt3 != null) prt3.anchoredPosition = new Vector2(0, -90 * uiScale);
