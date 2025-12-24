@@ -12,6 +12,7 @@ public class UIManager : MonoBehaviour
     // Runtime-resolved references (do not configure in inspector)
     private PokerGame game => UnityEngine.Object.FindObjectOfType<PokerGame>();
     private Text[] playerTexts;
+    private List<GameObject> playerTextGOs;
     private Text communityText;
     private Text potText;
     private Button dealButton;
@@ -29,6 +30,9 @@ public class UIManager : MonoBehaviour
     private Slider bigBlindSlider; private Text bigBlindLabel;
     private Button startButton;
     private GameObject paramsContainerGO;
+    private GameObject panelGO;
+    private Font uiFont;
+    private float uiScale = 1.5f;
 
     void Start()
     {
@@ -62,35 +66,23 @@ public class UIManager : MonoBehaviour
         int playerCount = (game != null) ? game.numPlayers : 4;
 
         // Create a simple vertical layout container for texts
-        var panelGO = new GameObject("UI Panel");
+        panelGO = new GameObject("UI Panel");
         panelGO.transform.SetParent(root, false);
         var panelRt = panelGO.AddComponent<RectTransform>();
-        // Center the panel and scale UI by 1.5x
-        float uiScale = 1.5f;
+        // Center the panel and scale UI
         panelRt.anchorMin = new Vector2(0.5f, 0.5f); panelRt.anchorMax = new Vector2(0.5f, 0.5f);
         panelRt.pivot = new Vector2(0.5f, 0.5f);
         panelRt.sizeDelta = new Vector2(800, 600) * uiScale;
         panelRt.anchoredPosition = Vector2.zero;
 
         // Prepare font
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = uiFont;
 
-        // Create player text fields
-        var list = new List<Text>();
-        for (int i = 0; i < playerCount; i++)
-        {
-            var tgo = new GameObject($"PlayerText_{i + 1}");
-            tgo.transform.SetParent(panelGO.transform, false);
-            var rt = tgo.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1);
-            rt.sizeDelta = new Vector2(300, 24) * uiScale;
-            rt.anchoredPosition = new Vector2(0, -24 * i * uiScale);
-            var txt = tgo.AddComponent<Text>();
-            txt.font = font; txt.fontSize = Mathf.RoundToInt(18 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.UpperLeft;
-            txt.text = $"P{i + 1}:";
-            list.Add(txt);
-        }
-        playerTexts = list.ToArray();
+        // Create player text fields based on existing game.players if available
+        playerTextGOs = new List<GameObject>();
+        int initialCount = (game != null && game.players != null) ? game.players.Count : playerCount;
+        RebuildPlayerTextFields(initialCount, font, uiScale);
 
         // Community text
         var cgo = new GameObject("CommunityText");
@@ -173,10 +165,10 @@ public class UIManager : MonoBehaviour
         float initDelay = 0.1f;
         if (game != null && game.aiConfig != null) initDelay = game.aiConfig.actionDelay;
         aiDelaySlider.value = initDelay;
-        aiDelayLabel.text = $"AI delay: {aiDelaySlider.value:0.00}s";
+        aiDelayLabel.text = $"AI 延迟：{aiDelaySlider.value:0.00}秒";
         aiDelaySlider.onValueChanged.AddListener((v) =>
         {
-            aiDelayLabel.text = $"AI delay: {v:0.00}s";
+            aiDelayLabel.text = $"AI 延迟：{v:0.00}秒";
             if (game != null)
             {
                 if (game.aiConfig == null)
@@ -201,19 +193,19 @@ public class UIManager : MonoBehaviour
         vlg.childForceExpandHeight = false; vlg.childForceExpandWidth = true; vlg.childAlignment = TextAnchor.UpperLeft;
         var csf = paramsContainerGO.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        raiseProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseProbability : 0.12f, out raiseProbLabel, "RaiseProb", font, uiScale);
-        betProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.betProbability : 0.06f, out betProbLabel, "BetProb", font, uiScale);
-        raiseBaseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 5f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeBase : 0.5f, out raiseBaseLabel, "RaiseBase", font, uiScale);
-        raiseScaleSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 3f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeAggressionScale : 1f, out raiseScaleLabel, "RaiseScale", font, uiScale);
-        minRaiseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 0.5f, out minRaiseLabel, "MinRaiseFrac", font, uiScale);
-        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 200f, out simIterLabel, "SimIter", font, uiScale);
+        raiseProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseProbability : 0.12f, out raiseProbLabel, "加注概率", font, uiScale);
+        betProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.betProbability : 0.06f, out betProbLabel, "下注概率", font, uiScale);
+        raiseBaseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 5f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeBase : 0.5f, out raiseBaseLabel, "基础加注", font, uiScale);
+        raiseScaleSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 3f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeAggressionScale : 1f, out raiseScaleLabel, "激进系数", font, uiScale);
+        minRaiseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 0.5f, out minRaiseLabel, "最小加注比例", font, uiScale);
+        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 200f, out simIterLabel, "模拟次数", font, uiScale);
         simIterSlider.wholeNumbers = true;
 
-        numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, out numPlayersLabel, "Players", font, uiScale);
+        numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, out numPlayersLabel, "玩家数", font, uiScale);
         numPlayersSlider.wholeNumbers = true;
-        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.smallBlindAmount : 5f, out smallBlindLabel, "SmallBlind", font, uiScale);
+        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.smallBlindAmount : 5f, out smallBlindLabel, "小盲注", font, uiScale);
         smallBlindSlider.wholeNumbers = true;
-        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.bigBlindAmount : 10f, out bigBlindLabel, "BigBlind", font, uiScale);
+        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.bigBlindAmount : 10f, out bigBlindLabel, "大盲注", font, uiScale);
         bigBlindSlider.wholeNumbers = true;
 
         // Start button
@@ -223,7 +215,7 @@ public class UIManager : MonoBehaviour
         startButton = sbtn.AddComponent<Button>();
         var sLabelGO = new GameObject("Label"); sLabelGO.transform.SetParent(sbtn.transform, false);
         var sLabelRt = sLabelGO.AddComponent<RectTransform>(); sLabelRt.sizeDelta = srt.sizeDelta; sLabelRt.anchoredPosition = Vector2.zero;
-        var sLabel = sLabelGO.AddComponent<Text>(); sLabel.font = font; sLabel.fontSize = Mathf.RoundToInt(16 * uiScale); sLabel.alignment = TextAnchor.MiddleCenter; sLabel.color = Color.white; sLabel.text = "Start Game";
+        var sLabel = sLabelGO.AddComponent<Text>(); sLabel.font = font; sLabel.fontSize = Mathf.RoundToInt(16 * uiScale); sLabel.alignment = TextAnchor.MiddleCenter; sLabel.color = Color.white; sLabel.text = "开始游戏";
         startButton.onClick.AddListener(OnStartClicked);
 
 
@@ -240,6 +232,36 @@ public class UIManager : MonoBehaviour
         GameEventBus.Subscribe(Events.Turn, onTurnWrapper);
         GameEventBus.Subscribe(Events.River, onRiverWrapper);
         GameEventBus.Subscribe(Events.HandStarted, onHandStartedWrapper);
+    }
+
+    // Recreate player text UI elements to match count
+    private void RebuildPlayerTextFields(int count, Font font, float uiScale)
+    {
+        // destroy existing
+        if (playerTextGOs != null)
+        {
+            foreach (var go in playerTextGOs)
+            {
+                if (go != null) Destroy(go);
+            }
+            playerTextGOs.Clear();
+        }
+        var list = new List<Text>();
+        for (int i = 0; i < count; i++)
+        {
+            var tgo = new GameObject($"PlayerText_{i + 1}");
+            tgo.transform.SetParent(panelGO.transform, false);
+            var rt = tgo.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1);
+            rt.sizeDelta = new Vector2(300, 24) * uiScale;
+            rt.anchoredPosition = new Vector2(0, -24 * i * uiScale);
+            var txt = tgo.AddComponent<Text>();
+            txt.font = font; txt.fontSize = Mathf.RoundToInt(18 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.UpperLeft;
+            txt.text = $"玩家{i + 1}：";
+            list.Add(txt);
+            playerTextGOs.Add(tgo);
+        }
+        playerTexts = list.ToArray();
     }
 
     void OnDestroy()
@@ -269,7 +291,12 @@ public class UIManager : MonoBehaviour
 
     private void OnHandStarted(List<Player> players)
     {
-        // When a new hand starts, perform a full refresh
+        // Rebuild player text fields if player count changed, then refresh
+        int cnt = (players != null) ? players.Count : ((game != null && game.players != null) ? game.players.Count : 0);
+        if (cnt != playerTexts.Length)
+        {
+            RebuildPlayerTextFields(cnt, uiFont, uiScale);
+        }
         Refresh(game);
     }
 
@@ -360,7 +387,7 @@ public class UIManager : MonoBehaviour
         var lblRt = lblGO.AddComponent<RectTransform>();
         var lbl = lblGO.AddComponent<Text>(); lbl.font = font; lbl.fontSize = Mathf.RoundToInt(12 * uiScale); lbl.color = Color.white; lbl.alignment = TextAnchor.MiddleLeft;
         // set initial label text
-        lbl.text = name + ": " + initial.ToString("0.##");
+        lbl.text = name + "： " + initial.ToString("0.##");
         var lblLE = lblGO.AddComponent<LayoutElement>();
         // measure preferred width
         var genSettings = lbl.GetGenerationSettings(Vector2.zero);
@@ -405,8 +432,8 @@ public class UIManager : MonoBehaviour
         slider.targetGraphic = handleImg;
 
         slider.value = initial;
-        lbl.text = name + ": " + slider.value.ToString("0.##");
-        slider.onValueChanged.AddListener((v) => { lbl.text = name + ": " + v.ToString("0.##"); });
+        lbl.text = name + "： " + slider.value.ToString("0.##");
+        slider.onValueChanged.AddListener((v) => { lbl.text = name + "： " + v.ToString("0.##"); });
 
         labelOut = lbl;
         return slider;
@@ -422,9 +449,9 @@ public class UIManager : MonoBehaviour
             {
                 var p = g.players[i];
                 if (p.hole != null && p.hole.Count >= 2)
-                    playerTexts[i].text = $"{p.name}: {p.hole[0]} {p.hole[1]}  Stack={p.stack}";
+                    playerTexts[i].text = $"{p.name}：{p.hole[0]} {p.hole[1]}  筹码：{p.stack}";
                 else
-                    playerTexts[i].text = $"{p.name}:  Stack={p.stack}";
+                    playerTexts[i].text = $"{p.name}：  筹码：{p.stack}";
             }
             else playerTexts[i].text = "";
         }
@@ -437,12 +464,12 @@ public class UIManager : MonoBehaviour
         if (resultText != null)
         {
             int w = g.DetermineWinner();
-            if (w >= 0) resultText.text = "Winner: P" + (w + 1);
+            if (w >= 0) resultText.text = "获胜者：玩家" + (w + 1);
             else resultText.text = "";
         }
         if (potText != null)
         {
-            potText.text = "Pot: " + g.pot.ToString();
+            potText.text = "底池：" + g.pot.ToString();
         }
     }
 }
