@@ -236,6 +236,18 @@ public class UIManager : MonoBehaviour
         GameEventBus.Subscribe(Events.HandStarted, onHandStartedWrapper);
     }
 
+    private IEnumerator FadeInCanvasGroup(CanvasGroup cg, float dur)
+    {
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            cg.alpha = Mathf.Clamp01(t / dur);
+            yield return null;
+        }
+        cg.alpha = 1f;
+    }
+
     // Recreate player text UI elements to match count
     private void RebuildPlayerTextFields(int count, Font font, float uiScale)
     {
@@ -254,11 +266,24 @@ public class UIManager : MonoBehaviour
             var tgo = new GameObject($"PlayerText_{i + 1}");
             tgo.transform.SetParent(panelGO.transform, false);
             var rt = tgo.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1);
-            rt.sizeDelta = new Vector2(300, 24) * uiScale;
-            rt.anchoredPosition = new Vector2(0, -24 * i * uiScale);
-            var txt = tgo.AddComponent<Text>();
-            txt.font = font; txt.fontSize = Mathf.RoundToInt(18 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.UpperLeft;
+            rt.sizeDelta = new Vector2(140, 28) * uiScale;
+
+            // Background card
+            var bgGo = new GameObject("BG");
+            bgGo.transform.SetParent(tgo.transform, false);
+            var bgRt = bgGo.AddComponent<RectTransform>();
+            bgRt.anchorMin = new Vector2(0.5f, 0.5f); bgRt.anchorMax = new Vector2(0.5f, 0.5f); bgRt.pivot = new Vector2(0.5f, 0.5f);
+            bgRt.sizeDelta = new Vector2(170, 34) * uiScale;
+            var img = bgGo.AddComponent<UnityEngine.UI.Image>(); img.color = new Color(0f, 0f, 0f, 0.5f);
+
+            // Text
+            var txtGo = new GameObject("Label");
+            txtGo.transform.SetParent(tgo.transform, false);
+            var txtRt = txtGo.AddComponent<RectTransform>();
+            txtRt.anchorMin = new Vector2(0.5f, 0.5f); txtRt.anchorMax = new Vector2(0.5f, 0.5f); txtRt.pivot = new Vector2(0.5f, 0.5f);
+            txtRt.sizeDelta = new Vector2(140, 28) * uiScale;
+            var txt = txtGo.AddComponent<Text>();
+            txt.font = font; txt.fontSize = Mathf.RoundToInt(14 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.MiddleCenter;
             txt.text = $"玩家{i + 1}：";
             list.Add(txt);
             playerTextGOs.Add(tgo);
@@ -283,6 +308,19 @@ public class UIManager : MonoBehaviour
                         rt.anchorMax = new Vector2(0.5f, 0.5f);
                         rt.pivot = new Vector2(0.5f, 0.5f);
                         rt.anchoredPosition = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
+
+                        // rotate background card to face center, keep text upright
+                        var bg = rt.Find("BG");
+                        if (bg != null)
+                        {
+                            var bgRt = bg.GetComponent<RectTransform>();
+                            if (bgRt != null) bgRt.localEulerAngles = new Vector3(0, 0, angleDeg - 90f);
+                        }
+
+                        // fade-in effect
+                        var cg = rt.GetComponent<CanvasGroup>(); if (cg == null) cg = rt.gameObject.AddComponent<CanvasGroup>();
+                        cg.alpha = 0f;
+                        StartCoroutine(FadeInCanvasGroup(cg, 0.25f));
                     }
                 }
             }
