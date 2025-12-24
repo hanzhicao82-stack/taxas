@@ -262,6 +262,40 @@ public class UIManager : MonoBehaviour
             playerTextGOs.Add(tgo);
         }
         playerTexts = list.ToArray();
+
+        // Reposition dependent UI elements based on new player count
+        float baseY = -24 * count * uiScale;
+        if (communityText != null)
+        {
+            var crt = communityText.GetComponent<RectTransform>();
+            if (crt != null) crt.anchoredPosition = new Vector2(0, baseY - 10 * uiScale);
+        }
+        if (resultText != null)
+        {
+            var rrt = resultText.GetComponent<RectTransform>();
+            if (rrt != null) rrt.anchoredPosition = new Vector2(0, baseY - 40 * uiScale);
+        }
+        if (potText != null)
+        {
+            var prt = potText.GetComponent<RectTransform>();
+            if (prt != null) prt.anchoredPosition = new Vector2(0, baseY - 64 * uiScale);
+        }
+        // AI delay label/slider and params container
+        if (aiDelayLabel != null)
+        {
+            var art = aiDelayLabel.GetComponent<RectTransform>();
+            if (art != null) art.anchoredPosition = new Vector2(0, baseY - 92 * uiScale);
+        }
+        if (aiDelaySlider != null)
+        {
+            var asrt = aiDelaySlider.GetComponent<RectTransform>();
+            if (asrt != null) asrt.anchoredPosition = new Vector2(210 * uiScale, baseY - 92 * uiScale);
+        }
+        if (paramsContainerGO != null)
+        {
+            var prt = paramsContainerGO.GetComponent<RectTransform>();
+            if (prt != null) prt.anchoredPosition = new Vector2(0, baseY - 122 * uiScale);
+        }
     }
 
     void OnDestroy()
