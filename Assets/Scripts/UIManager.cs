@@ -33,6 +33,7 @@ public class UIManager : MonoBehaviour
     private GameObject panelGO;
     private Font uiFont;
     private float uiScale = 1.5f;
+    private RectTransform panelRect;
 
     void Start()
     {
@@ -69,6 +70,7 @@ public class UIManager : MonoBehaviour
         panelGO = new GameObject("UI Panel");
         panelGO.transform.SetParent(root, false);
         var panelRt = panelGO.AddComponent<RectTransform>();
+        panelRect = panelRt;
         // Center the panel and scale UI
         panelRt.anchorMin = new Vector2(0.5f, 0.5f); panelRt.anchorMax = new Vector2(0.5f, 0.5f);
         panelRt.pivot = new Vector2(0.5f, 0.5f);
@@ -88,29 +90,29 @@ public class UIManager : MonoBehaviour
         var cgo = new GameObject("CommunityText");
         cgo.transform.SetParent(panelGO.transform, false);
         var crt = cgo.AddComponent<RectTransform>();
-        crt.anchorMin = new Vector2(0, 1); crt.anchorMax = new Vector2(0, 1); crt.pivot = new Vector2(0, 1);
+        crt.anchorMin = new Vector2(0.5f, 0.5f); crt.anchorMax = new Vector2(0.5f, 0.5f); crt.pivot = new Vector2(0.5f, 0.5f);
         crt.sizeDelta = new Vector2(600, 24) * uiScale;
-        crt.anchoredPosition = new Vector2(0, -24 * playerCount * uiScale - 10 * uiScale);
-        communityText = cgo.AddComponent<Text>(); communityText.font = font; communityText.fontSize = Mathf.RoundToInt(18 * uiScale); communityText.color = Color.yellow;
+        crt.anchoredPosition = Vector2.zero;
+        communityText = cgo.AddComponent<Text>(); communityText.font = font; communityText.fontSize = Mathf.RoundToInt(18 * uiScale); communityText.color = Color.yellow; communityText.alignment = TextAnchor.MiddleCenter;
         communityText.text = "";
 
         // Result text
         var rgo = new GameObject("ResultText");
         rgo.transform.SetParent(panelGO.transform, false);
         var rrt = rgo.AddComponent<RectTransform>();
-        rrt.anchorMin = new Vector2(0, 1); rrt.anchorMax = new Vector2(0, 1); rrt.pivot = new Vector2(0, 1);
+        rrt.anchorMin = new Vector2(0.5f, 0.5f); rrt.anchorMax = new Vector2(0.5f, 0.5f); rrt.pivot = new Vector2(0.5f, 0.5f);
         rrt.sizeDelta = new Vector2(400, 24) * uiScale;
-        rrt.anchoredPosition = new Vector2(0, -24 * playerCount * uiScale - 40 * uiScale);
-        resultText = rgo.AddComponent<Text>(); resultText.font = font; resultText.fontSize = Mathf.RoundToInt(18 * uiScale); resultText.color = Color.cyan;
+        rrt.anchoredPosition = new Vector2(0, -30 * uiScale);
+        resultText = rgo.AddComponent<Text>(); resultText.font = font; resultText.fontSize = Mathf.RoundToInt(18 * uiScale); resultText.color = Color.cyan; resultText.alignment = TextAnchor.MiddleCenter;
 
         // Pot text (display current pot)
         var pgo = new GameObject("PotText");
         pgo.transform.SetParent(panelGO.transform, false);
         var prt = pgo.AddComponent<RectTransform>();
-        prt.anchorMin = new Vector2(0, 1); prt.anchorMax = new Vector2(0, 1); prt.pivot = new Vector2(0, 1);
+        prt.anchorMin = new Vector2(0.5f, 0.5f); prt.anchorMax = new Vector2(0.5f, 0.5f); prt.pivot = new Vector2(0.5f, 0.5f);
         prt.sizeDelta = new Vector2(400, 24) * uiScale;
-        prt.anchoredPosition = new Vector2(0, -24 * playerCount * uiScale - 64 * uiScale);
-        potText = pgo.AddComponent<Text>(); potText.font = font; potText.fontSize = Mathf.RoundToInt(16 * uiScale); potText.color = Color.magenta;
+        prt.anchoredPosition = new Vector2(0, -60 * uiScale);
+        potText = pgo.AddComponent<Text>(); potText.font = font; potText.fontSize = Mathf.RoundToInt(16 * uiScale); potText.color = Color.magenta; potText.alignment = TextAnchor.MiddleCenter;
 
         // AI delay slider + label
         var sgo = new GameObject("AIDelayLabel");
@@ -262,39 +264,49 @@ public class UIManager : MonoBehaviour
             playerTextGOs.Add(tgo);
         }
         playerTexts = list.ToArray();
+        // Position player labels in a circle around panel center
+        if (panelRect != null)
+        {
+            float radius = Mathf.Min(panelRect.sizeDelta.x, panelRect.sizeDelta.y) * 0.45f;
+            int n = count;
+            if (n > 0)
+            {
+                float angleStep = 360f / n;
+                for (int i = 0; i < n; i++)
+                {
+                    float angleDeg = 90f - i * angleStep; // start at top (90 deg) and go clockwise
+                    float rad = angleDeg * Mathf.Deg2Rad;
+                    var rt = playerTextGOs[i].GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        rt.anchorMin = new Vector2(0.5f, 0.5f);
+                        rt.anchorMax = new Vector2(0.5f, 0.5f);
+                        rt.pivot = new Vector2(0.5f, 0.5f);
+                        rt.anchoredPosition = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
+                    }
+                }
+            }
+        }
 
-        // Reposition dependent UI elements based on new player count
-        float baseY = -24 * count * uiScale;
+        // Ensure community is centered
         if (communityText != null)
         {
-            var crt = communityText.GetComponent<RectTransform>();
-            if (crt != null) crt.anchoredPosition = new Vector2(0, baseY - 10 * uiScale);
+            var crt2 = communityText.GetComponent<RectTransform>();
+            if (crt2 != null) crt2.anchoredPosition = Vector2.zero;
         }
+        // place result and pot under center
         if (resultText != null)
         {
-            var rrt = resultText.GetComponent<RectTransform>();
-            if (rrt != null) rrt.anchoredPosition = new Vector2(0, baseY - 40 * uiScale);
+            var rrt2 = resultText.GetComponent<RectTransform>(); if (rrt2 != null) rrt2.anchoredPosition = new Vector2(0, -30 * uiScale);
         }
         if (potText != null)
         {
-            var prt = potText.GetComponent<RectTransform>();
-            if (prt != null) prt.anchoredPosition = new Vector2(0, baseY - 64 * uiScale);
+            var prt2 = potText.GetComponent<RectTransform>(); if (prt2 != null) prt2.anchoredPosition = new Vector2(0, -60 * uiScale);
         }
-        // AI delay label/slider and params container
-        if (aiDelayLabel != null)
-        {
-            var art = aiDelayLabel.GetComponent<RectTransform>();
-            if (art != null) art.anchoredPosition = new Vector2(0, baseY - 92 * uiScale);
-        }
-        if (aiDelaySlider != null)
-        {
-            var asrt = aiDelaySlider.GetComponent<RectTransform>();
-            if (asrt != null) asrt.anchoredPosition = new Vector2(210 * uiScale, baseY - 92 * uiScale);
-        }
+        // move params container a bit below
         if (paramsContainerGO != null)
         {
-            var prt = paramsContainerGO.GetComponent<RectTransform>();
-            if (prt != null) prt.anchoredPosition = new Vector2(0, baseY - 122 * uiScale);
+            var prt3 = paramsContainerGO.GetComponent<RectTransform>(); if (prt3 != null) prt3.anchoredPosition = new Vector2(0, -90 * uiScale);
         }
     }
 
