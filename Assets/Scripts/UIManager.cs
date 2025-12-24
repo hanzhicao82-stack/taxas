@@ -207,7 +207,7 @@ public class UIManager : MonoBehaviour
         raiseBaseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 5f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeBase : 0.5f, out raiseBaseLabel, "基础加注", font, uiScale);
         raiseScaleSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 3f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeAggressionScale : 1f, out raiseScaleLabel, "激进系数", font, uiScale);
         minRaiseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 0.5f, out minRaiseLabel, "最小加注比例", font, uiScale);
-        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 200f, out simIterLabel, "模拟次数", font, uiScale);
+        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 20, out simIterLabel, "模拟次数", font, uiScale);
         simIterSlider.wholeNumbers = true;
 
         numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, out numPlayersLabel, "玩家数", font, uiScale);
@@ -217,31 +217,13 @@ public class UIManager : MonoBehaviour
         bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.bigBlindAmount : 10f, out bigBlindLabel, "大盲注", font, uiScale);
         bigBlindSlider.wholeNumbers = true;
 
-        // Start button
-        var sbtn = new GameObject("StartButton"); sbtn.transform.SetParent(panelGO.transform, false);
-        var srt = sbtn.AddComponent<RectTransform>(); srt.anchorMin = new Vector2(0.5f, 0); srt.anchorMax = new Vector2(0.5f, 0); srt.pivot = new Vector2(0.5f, 0); srt.sizeDelta = new Vector2(160, 28) * uiScale; srt.anchoredPosition = new Vector2(0, 12 * uiScale);
-        var sImg = sbtn.AddComponent<UnityEngine.UI.Image>(); sImg.color = new Color(0.1f, 0.5f, 0.9f);
-        startButton = sbtn.AddComponent<Button>();
-        var sLabelGO = new GameObject("Label"); sLabelGO.transform.SetParent(sbtn.transform, false);
-        var sLabelRt = sLabelGO.AddComponent<RectTransform>(); sLabelRt.sizeDelta = srt.sizeDelta; sLabelRt.anchoredPosition = Vector2.zero;
-        var sLabel = sLabelGO.AddComponent<Text>(); sLabel.font = font; sLabel.fontSize = Mathf.RoundToInt(16 * uiScale); sLabel.alignment = TextAnchor.MiddleCenter; sLabel.color = Color.white; sLabel.text = "开始游戏";
+        // Start button (use helper)
+        startButton = CreateButton("StartButton", panelGO.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 12 * uiScale), new Vector2(160, 28) * uiScale, new Color(0.1f, 0.5f, 0.9f), "开始游戏", font, Mathf.RoundToInt(16 * uiScale));
         startButton.onClick.AddListener(OnStartClicked);
 
         // Restart button (initially hidden). Shown during a run to allow cancelling and returning to settings
-        restartButtonGO = new GameObject("RestartButton");
-        restartButtonGO.transform.SetParent(panelGO.transform, false);
-        rrt = restartButtonGO.AddComponent<RectTransform>();
-        // place restart in the center of the panel/screen
-        rrt.anchorMin = new Vector2(0.5f, 0.5f);
-        rrt.anchorMax = new Vector2(0.5f, 0.5f);
-        rrt.pivot = new Vector2(0.5f, 0.5f);
-        rrt.sizeDelta = new Vector2(160, 28) * uiScale;
-        rrt.anchoredPosition = Vector2.zero;
-        var rImg = restartButtonGO.AddComponent<UnityEngine.UI.Image>(); rImg.color = new Color(0.9f, 0.2f, 0.2f);
-        restartButton = restartButtonGO.AddComponent<Button>();
-        var rLabelGO = new GameObject("Label"); rLabelGO.transform.SetParent(restartButtonGO.transform, false);
-        var rLabelRt = rLabelGO.AddComponent<RectTransform>(); rLabelRt.sizeDelta = rrt.sizeDelta; rLabelRt.anchoredPosition = Vector2.zero;
-        var rLabel = rLabelGO.AddComponent<Text>(); rLabel.font = font; rLabel.fontSize = Mathf.RoundToInt(16 * uiScale); rLabel.alignment = TextAnchor.MiddleCenter; rLabel.color = Color.white; rLabel.text = "Restart";
+        restartButton = CreateButton("RestartButton", panelGO.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160, 28) * uiScale, new Color(0.9f, 0.2f, 0.2f), "Restart", font, Mathf.RoundToInt(16 * uiScale));
+        restartButtonGO = restartButton.gameObject;
         restartButton.onClick.AddListener(OnRestartClicked);
         restartButtonGO.SetActive(false);
 
@@ -628,32 +610,14 @@ public class UIManager : MonoBehaviour
     // Hide settings while the provided inner routine runs, then restore UI
     private IEnumerator RunGameWithHiddenSettings(IEnumerator inner)
     {
-        if (paramsContainerGO != null)
-        {
-            paramsContainerGO.SetActive(false);
-        }
-        if (aiDelayLabel != null)
-        {
-            aiDelayLabel.gameObject.SetActive(false);
-        }
-        if (aiDelaySlider != null)
-        {
-            aiDelaySlider.gameObject.SetActive(false);
-        }
-        if (startButton != null)
-        {
-            startButton.gameObject.SetActive(false);
-        }
-        if (dealButton != null)
-        {
-            dealButton.gameObject.SetActive(false);
-        }
+        SetActiveSafe(paramsContainerGO, false);
+        SetActiveSafe(aiDelayLabel?.gameObject, false);
+        SetActiveSafe(aiDelaySlider?.gameObject, false);
+        SetActiveSafe(startButton?.gameObject, false);
+        SetActiveSafe(dealButton?.gameObject, false);
 
         // show restart button so user can cancel and return to settings
-        if (restartButtonGO != null)
-        {
-            restartButtonGO.SetActive(true);
-        }
+        SetActiveSafe(restartButtonGO, true);
 
         // run inner using wrapper so we can cancel from Restart
         currentRunFinished = false;
@@ -674,30 +638,12 @@ public class UIManager : MonoBehaviour
             currentRunCoroutine = null;
         }
 
-        if (restartButtonGO != null)
-        {
-            restartButtonGO.SetActive(false);
-        }
-        if (paramsContainerGO != null)
-        {
-            paramsContainerGO.SetActive(true);
-        }
-        if (aiDelayLabel != null)
-        {
-            aiDelayLabel.gameObject.SetActive(true);
-        }
-        if (aiDelaySlider != null)
-        {
-            aiDelaySlider.gameObject.SetActive(true);
-        }
-        if (startButton != null)
-        {
-            startButton.gameObject.SetActive(true);
-        }
-        if (dealButton != null)
-        {
-            dealButton.gameObject.SetActive(true);
-        }
+        SetActiveSafe(restartButtonGO, false);
+        SetActiveSafe(paramsContainerGO, true);
+        SetActiveSafe(aiDelayLabel?.gameObject, true);
+        SetActiveSafe(aiDelaySlider?.gameObject, true);
+        SetActiveSafe(startButton?.gameObject, true);
+        SetActiveSafe(dealButton?.gameObject, true);
     }
 
     private IEnumerator RunInnerAndMark(IEnumerator inner)
@@ -729,6 +675,29 @@ public class UIManager : MonoBehaviour
         {
             restartButtonGO.SetActive(false);
         }
+    }
+
+    // Small helpers to reduce repetition
+    private void SetActiveSafe(GameObject go, bool active)
+    {
+        if (go != null)
+        {
+            go.SetActive(active);
+        }
+    }
+
+    private Button CreateButton(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPos, Vector2 size, Color color, string labelText, Font font, int fontSize)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = anchorMin; rt.anchorMax = anchorMax; rt.pivot = pivot; rt.sizeDelta = size; rt.anchoredPosition = anchoredPos;
+        var img = go.AddComponent<UnityEngine.UI.Image>(); img.color = color;
+        var btn = go.AddComponent<Button>();
+        var lblGO = new GameObject("Label"); lblGO.transform.SetParent(go.transform, false);
+        var lblRt = lblGO.AddComponent<RectTransform>(); lblRt.sizeDelta = size; lblRt.anchoredPosition = Vector2.zero;
+        var txt = lblGO.AddComponent<Text>(); txt.font = font; txt.fontSize = fontSize; txt.alignment = TextAnchor.MiddleCenter; txt.color = Color.white; txt.text = labelText;
+        return btn;
     }
 
 
