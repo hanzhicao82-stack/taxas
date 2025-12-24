@@ -15,7 +15,7 @@ public class PokerGameFlowTest : MonoBehaviour
     public int handsToPlay = 10;
     public int numPlayers = 4;
 
-    IEnumerator Start()
+    public IEnumerator Run(AIConfig config, int handsToPlay, int numPlayers)
     {
         Debug.Log("PokerGameFlowTest: starting flow test...");
 
@@ -23,6 +23,7 @@ public class PokerGameFlowTest : MonoBehaviour
         var go = new GameObject("PokerGameTestRunner");
         var game = go.AddComponent<PokerGame>();
         game.numPlayers = numPlayers;
+        game.aiConfig = config;
 
         // 初始化玩家并设定统一筹码，确保可预测的初始总量
         game.players = new List<Player>();
