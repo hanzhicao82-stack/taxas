@@ -578,17 +578,49 @@ public class UIManager : MonoBehaviour
     {
         // Update UI to reflect current game state (players, community cards, winner).
         if (g == null) return;
-        for (int i = 0; i < playerTexts.Length; i++)
+        // Prefer updating the Label child on our playerTextGOs so we target the right Text component
+        if (playerTextGOs != null && playerTextGOs.Count > 0)
         {
-            if (i < g.players.Count)
+            for (int i = 0; i < playerTextGOs.Count; i++)
             {
-                var p = g.players[i];
-                if (p.hole != null && p.hole.Count >= 2)
-                    playerTexts[i].text = $"{p.name}：{p.hole[0]} {p.hole[1]}  筹码：{p.stack}";
+                var go = playerTextGOs[i];
+                var label = go != null ? go.transform.Find("Label")?.GetComponent<Text>() ?? go.GetComponentInChildren<Text>() : null;
+                if (label == null) continue;
+
+                if (i < g.players.Count)
+                {
+                    var p = g.players[i];
+                    string holeStr = "";
+                    if (p.hole != null && p.hole.Count >= 2)
+                        holeStr = $"{p.hole[0]} {p.hole[1]} ";
+                    label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
+                }
                 else
-                    playerTexts[i].text = $"{p.name}：  筹码：{p.stack}";
+                {
+                    label.text = "";
+                }
             }
-            else playerTexts[i].text = "";
+        }
+        else
+        {
+            // fallback to old array if present
+            if (playerTexts != null)
+            {
+                for (int i = 0; i < playerTexts.Length; i++)
+                {
+                    var label = playerTexts[i];
+                    if (label == null) continue;
+                    if (i < g.players.Count)
+                    {
+                        var p = g.players[i];
+                        string holeStr = "";
+                        if (p.hole != null && p.hole.Count >= 2)
+                            holeStr = $"{p.hole[0]} {p.hole[1]} ";
+                        label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
+                    }
+                    else label.text = "";
+                }
+            }
         }
         if (communityText != null)
         {
