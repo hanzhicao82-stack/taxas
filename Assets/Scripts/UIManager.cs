@@ -34,6 +34,10 @@ public class UIManager : MonoBehaviour
     private Font uiFont;
     private float uiScale = 1.5f;
     private RectTransform panelRect;
+    private Coroutine currentRunCoroutine;
+    private bool currentRunFinished;
+    private Button restartButton;
+    private GameObject restartButtonGO;
 
     void Start()
     {
@@ -165,7 +169,10 @@ public class UIManager : MonoBehaviour
         aiDelaySlider.targetGraphic = handleImg;
         // initial value
         float initDelay = 0.1f;
-        if (game != null && game.aiConfig != null) initDelay = game.aiConfig.actionDelay;
+        if (game != null && game.aiConfig != null)
+        {
+            initDelay = game.aiConfig.actionDelay;
+        }
         aiDelaySlider.value = initDelay;
         aiDelayLabel.text = $"AI 延迟：{aiDelaySlider.value:0.00}秒";
         aiDelaySlider.onValueChanged.AddListener((v) =>
@@ -220,10 +227,27 @@ public class UIManager : MonoBehaviour
         var sLabel = sLabelGO.AddComponent<Text>(); sLabel.font = font; sLabel.fontSize = Mathf.RoundToInt(16 * uiScale); sLabel.alignment = TextAnchor.MiddleCenter; sLabel.color = Color.white; sLabel.text = "开始游戏";
         startButton.onClick.AddListener(OnStartClicked);
 
+        // Restart button (initially hidden). Shown during a run to allow cancelling and returning to settings
+        restartButtonGO = new GameObject("RestartButton");
+        restartButtonGO.transform.SetParent(panelGO.transform, false);
+        rrt = restartButtonGO.AddComponent<RectTransform>();
+        // place restart in the center of the panel/screen
+        rrt.anchorMin = new Vector2(0.5f, 0.5f);
+        rrt.anchorMax = new Vector2(0.5f, 0.5f);
+        rrt.pivot = new Vector2(0.5f, 0.5f);
+        rrt.sizeDelta = new Vector2(160, 28) * uiScale;
+        rrt.anchoredPosition = Vector2.zero;
+        var rImg = restartButtonGO.AddComponent<UnityEngine.UI.Image>(); rImg.color = new Color(0.9f, 0.2f, 0.2f);
+        restartButton = restartButtonGO.AddComponent<Button>();
+        var rLabelGO = new GameObject("Label"); rLabelGO.transform.SetParent(restartButtonGO.transform, false);
+        var rLabelRt = rLabelGO.AddComponent<RectTransform>(); rLabelRt.sizeDelta = rrt.sizeDelta; rLabelRt.anchoredPosition = Vector2.zero;
+        var rLabel = rLabelGO.AddComponent<Text>(); rLabel.font = font; rLabel.fontSize = Mathf.RoundToInt(16 * uiScale); rLabel.alignment = TextAnchor.MiddleCenter; rLabel.color = Color.white; rLabel.text = "Restart";
+        restartButton.onClick.AddListener(OnRestartClicked);
+        restartButtonGO.SetActive(false);
 
 
-        // Initial refresh
-        Refresh(game);
+
+
 
         // Subscribe to game events for incremental updates using stored wrappers so we can unsubscribe reliably
         onFlopWrapper = (obj) => { try { var t = (Tuple<List<Card>, List<Card>>)obj; OnCommunityUpdated(t); } catch { } };
@@ -271,7 +295,10 @@ public class UIManager : MonoBehaviour
 
     private IEnumerator MoveRectTo(RectTransform rt, Vector2 target, float dur)
     {
-        if (rt == null) yield break;
+        if (rt == null)
+        {
+            yield break;
+        }
         Vector2 start = rt.anchoredPosition;
         float t = 0f;
         while (t < dur)
@@ -286,7 +313,10 @@ public class UIManager : MonoBehaviour
 
     private IEnumerator RotateRectTo(RectTransform rt, float targetZ, float dur)
     {
-        if (rt == null) yield break;
+        if (rt == null)
+        {
+            yield break;
+        }
         float startZ = rt.localEulerAngles.z;
         // normalize shortest path
         float delta = Mathf.DeltaAngle(startZ, targetZ);
@@ -304,10 +334,16 @@ public class UIManager : MonoBehaviour
 
     private IEnumerator ArrangePlayersSmooth(List<GameObject> gos, float uiScale, float dur)
     {
-        if (panelRect == null) yield break;
+        if (panelRect == null)
+        {
+            yield break;
+        }
         int n = gos.Count;
         float radius = Mathf.Min(panelRect.sizeDelta.x, panelRect.sizeDelta.y) * 0.45f;
-        if (n <= 0) yield break;
+        if (n <= 0)
+        {
+            yield break;
+        }
 
         float angleStep = 360f / n;
         List<Coroutine> running = new List<Coroutine>();
@@ -316,7 +352,10 @@ public class UIManager : MonoBehaviour
             float angleDeg = 90f - i * angleStep;
             float rad = angleDeg * Mathf.Deg2Rad;
             var rt = gos[i].GetComponent<RectTransform>();
-            if (rt == null) continue;
+            if (rt == null)
+            {
+                continue;
+            }
             Vector2 target = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
 
             // start movement coroutine
@@ -335,7 +374,10 @@ public class UIManager : MonoBehaviour
 
             // fade in if needed
             var cg = rt.GetComponent<CanvasGroup>();
-            if (cg != null) StartCoroutine(FadeInCanvasGroup(cg, dur * 0.8f));
+            if (cg != null)
+            {
+                StartCoroutine(FadeInCanvasGroup(cg, dur * 0.8f));
+            }
         }
         yield return new WaitForSeconds(dur);
     }
@@ -343,7 +385,10 @@ public class UIManager : MonoBehaviour
     // Recreate player text UI elements to match count and animate transitions
     private void RebuildPlayerTextFields(int count, Font font, float uiScale)
     {
-        if (playerTextGOs == null) playerTextGOs = new List<GameObject>();
+        if (playerTextGOs == null)
+        {
+            playerTextGOs = new List<GameObject>();
+        }
 
         // create missing elements
         for (int idx = playerTextGOs.Count; idx < count; idx++)
@@ -385,7 +430,10 @@ public class UIManager : MonoBehaviour
         {
             var last = playerTextGOs[playerTextGOs.Count - 1];
             playerTextGOs.RemoveAt(playerTextGOs.Count - 1);
-            if (last != null) Destroy(last);
+            if (last != null)
+            {
+                Destroy(last);
+            }
         }
 
         // update label list
@@ -393,7 +441,10 @@ public class UIManager : MonoBehaviour
         for (int j = 0; j < playerTextGOs.Count; j++)
         {
             var label = playerTextGOs[j].transform.Find("Label")?.GetComponent<Text>();
-            if (label == null) label = playerTextGOs[j].GetComponentInChildren<Text>();
+            if (label == null)
+            {
+                label = playerTextGOs[j].GetComponentInChildren<Text>();
+            }
             labelsList.Add(label);
         }
         playerTexts = labelsList.ToArray();
@@ -404,42 +455,87 @@ public class UIManager : MonoBehaviour
         // Ensure community/result/pot/params placed relative to center
         if (communityText != null)
         {
-            var crt2 = communityText.GetComponent<RectTransform>(); if (crt2 != null) crt2.anchoredPosition = Vector2.zero;
+            var crt2 = communityText.GetComponent<RectTransform>();
+            if (crt2 != null)
+            {
+                crt2.anchoredPosition = Vector2.zero;
+            }
         }
         if (resultText != null)
         {
-            var rrt2 = resultText.GetComponent<RectTransform>(); if (rrt2 != null) rrt2.anchoredPosition = new Vector2(0, -30 * uiScale);
+            var rrt2 = resultText.GetComponent<RectTransform>();
+            if (rrt2 != null)
+            {
+                rrt2.anchoredPosition = new Vector2(0, -30 * uiScale);
+            }
         }
         if (potText != null)
         {
-            var prt2 = potText.GetComponent<RectTransform>(); if (prt2 != null) prt2.anchoredPosition = new Vector2(0, -60 * uiScale);
+            var prt2 = potText.GetComponent<RectTransform>();
+            if (prt2 != null)
+            {
+                prt2.anchoredPosition = new Vector2(0, -60 * uiScale);
+            }
         }
         if (paramsContainerGO != null)
         {
-            var prt3 = paramsContainerGO.GetComponent<RectTransform>(); if (prt3 != null) prt3.anchoredPosition = new Vector2(0, -90 * uiScale);
+            var prt3 = paramsContainerGO.GetComponent<RectTransform>();
+            if (prt3 != null)
+            {
+                prt3.anchoredPosition = new Vector2(0, -90 * uiScale);
+            }
         }
     }
 
     void OnDestroy()
     {
         // Clean up subscriptions
-        if (onFlopWrapper != null) GameEventBus.Unsubscribe(Events.Flop, onFlopWrapper);
-        if (onTurnWrapper != null) GameEventBus.Unsubscribe(Events.Turn, onTurnWrapper);
-        if (onRiverWrapper != null) GameEventBus.Unsubscribe(Events.River, onRiverWrapper);
-        if (onHandStartedWrapper != null) GameEventBus.Unsubscribe(Events.HandStarted, onHandStartedWrapper);
+        if (onFlopWrapper != null)
+        {
+            GameEventBus.Unsubscribe(Events.Flop, onFlopWrapper);
+        }
+        if (onTurnWrapper != null)
+        {
+            GameEventBus.Unsubscribe(Events.Turn, onTurnWrapper);
+        }
+        if (onRiverWrapper != null)
+        {
+            GameEventBus.Unsubscribe(Events.River, onRiverWrapper);
+        }
+        if (onHandStartedWrapper != null)
+        {
+            GameEventBus.Unsubscribe(Events.HandStarted, onHandStartedWrapper);
+        }
 
-        if (dealButton != null) dealButton.onClick.RemoveListener(OnDealClicked);
+        if (dealButton != null)
+        {
+            dealButton.onClick.RemoveListener(OnDealClicked);
+        }
+        if (startButton != null)
+        {
+            startButton.onClick.RemoveListener(OnStartClicked);
+        }
+        if (restartButton != null)
+        {
+            restartButton.onClick.RemoveListener(OnRestartClicked);
+        }
     }
 
     // Wrappers are used for Unsubscribe because Subscribe<T> wraps handlers internally
     private void OnCommunityUpdated(Tuple<List<Card>, List<Card>> tpl)
     {
-        if (tpl == null) return;
+        if (tpl == null)
+        {
+            return;
+        }
         // Incrementally append added cards to the communityText, then do a full refresh
         if (communityText != null && tpl.Item2 != null && tpl.Item2.Count > 0)
         {
             var sb = new StringBuilder(communityText.text ?? "");
-            foreach (var c in tpl.Item2) sb.Append(c).Append(' ');
+            foreach (var c in tpl.Item2)
+            {
+                sb.Append(c).Append(' ');
+            }
             communityText.text = sb.ToString();
         }
         Refresh(game);
@@ -476,16 +572,40 @@ public class UIManager : MonoBehaviour
 
         // Build or reuse an AIConfig to pass to the test/run
         AIConfig cfg = null;
-        if (game != null && game.aiConfig != null) cfg = game.aiConfig;
-        if (cfg == null) cfg = ScriptableObject.CreateInstance<AIConfig>();
+        if (game != null && game.aiConfig != null)
+        {
+            cfg = game.aiConfig;
+        }
+        if (cfg == null)
+        {
+            cfg = ScriptableObject.CreateInstance<AIConfig>();
+        }
 
         // Pull values from sliders into cfg
-        if (betProbSlider != null) cfg.betProbability = betProbSlider.value;
-        if (raiseBaseSlider != null) cfg.raiseSizeBase = raiseBaseSlider.value;
-        if (raiseScaleSlider != null) cfg.raiseSizeAggressionScale = raiseScaleSlider.value;
-        if (minRaiseSlider != null) cfg.minRaiseFraction = minRaiseSlider.value;
-        if (simIterSlider != null) cfg.simIterations = Mathf.Max(1, Mathf.RoundToInt(simIterSlider.value));
-        if (aiDelaySlider != null) cfg.actionDelay = aiDelaySlider.value;
+        if (betProbSlider != null)
+        {
+            cfg.betProbability = betProbSlider.value;
+        }
+        if (raiseBaseSlider != null)
+        {
+            cfg.raiseSizeBase = raiseBaseSlider.value;
+        }
+        if (raiseScaleSlider != null)
+        {
+            cfg.raiseSizeAggressionScale = raiseScaleSlider.value;
+        }
+        if (minRaiseSlider != null)
+        {
+            cfg.minRaiseFraction = minRaiseSlider.value;
+        }
+        if (simIterSlider != null)
+        {
+            cfg.simIterations = Mathf.Max(1, Mathf.RoundToInt(simIterSlider.value));
+        }
+        if (aiDelaySlider != null)
+        {
+            cfg.actionDelay = aiDelaySlider.value;
+        }
 
         // Apply number of players and blinds to the active game if present
         int players = (numPlayersSlider != null) ? Mathf.RoundToInt(numPlayersSlider.value) : ((game != null) ? game.numPlayers : 4);
@@ -508,19 +628,107 @@ public class UIManager : MonoBehaviour
     // Hide settings while the provided inner routine runs, then restore UI
     private IEnumerator RunGameWithHiddenSettings(IEnumerator inner)
     {
-        if (paramsContainerGO != null) paramsContainerGO.SetActive(false);
-        if (aiDelayLabel != null) aiDelayLabel.gameObject.SetActive(false);
-        if (aiDelaySlider != null) aiDelaySlider.gameObject.SetActive(false);
-        if (startButton != null) startButton.interactable = false;
-        if (dealButton != null) dealButton.gameObject.SetActive(false);
+        if (paramsContainerGO != null)
+        {
+            paramsContainerGO.SetActive(false);
+        }
+        if (aiDelayLabel != null)
+        {
+            aiDelayLabel.gameObject.SetActive(false);
+        }
+        if (aiDelaySlider != null)
+        {
+            aiDelaySlider.gameObject.SetActive(false);
+        }
+        if (startButton != null)
+        {
+            startButton.gameObject.SetActive(false);
+        }
+        if (dealButton != null)
+        {
+            dealButton.gameObject.SetActive(false);
+        }
 
-        if (inner != null) yield return StartCoroutine(inner);
+        // show restart button so user can cancel and return to settings
+        if (restartButtonGO != null)
+        {
+            restartButtonGO.SetActive(true);
+        }
 
-        if (paramsContainerGO != null) paramsContainerGO.SetActive(true);
-        if (aiDelayLabel != null) aiDelayLabel.gameObject.SetActive(true);
-        if (aiDelaySlider != null) aiDelaySlider.gameObject.SetActive(true);
-        if (startButton != null) startButton.interactable = true;
-        if (dealButton != null) dealButton.gameObject.SetActive(true);
+        // run inner using wrapper so we can cancel from Restart
+        currentRunFinished = false;
+        currentRunCoroutine = null;
+        if (inner != null)
+        {
+            currentRunCoroutine = StartCoroutine(RunInnerAndMark(inner));
+            while (!currentRunFinished)
+            {
+                yield return null;
+            }
+        }
+
+        // cleanup
+        if (currentRunCoroutine != null)
+        {
+            StopCoroutine(currentRunCoroutine);
+            currentRunCoroutine = null;
+        }
+
+        if (restartButtonGO != null)
+        {
+            restartButtonGO.SetActive(false);
+        }
+        if (paramsContainerGO != null)
+        {
+            paramsContainerGO.SetActive(true);
+        }
+        if (aiDelayLabel != null)
+        {
+            aiDelayLabel.gameObject.SetActive(true);
+        }
+        if (aiDelaySlider != null)
+        {
+            aiDelaySlider.gameObject.SetActive(true);
+        }
+        if (startButton != null)
+        {
+            startButton.gameObject.SetActive(true);
+        }
+        if (dealButton != null)
+        {
+            dealButton.gameObject.SetActive(true);
+        }
+    }
+
+    private IEnumerator RunInnerAndMark(IEnumerator inner)
+    {
+        if (inner != null)
+        {
+            yield return inner;
+        }
+        currentRunFinished = true;
+    }
+
+    private void OnRestartClicked()
+    {
+        // Cancel running test and return to settings
+        if (currentRunCoroutine != null)
+        {
+            StopCoroutine(currentRunCoroutine);
+            currentRunCoroutine = null;
+        }
+        currentRunFinished = true;
+        // also destroy the transient Test GameObject if present
+        var t = GameObject.Find("Test");
+        if (t != null)
+        {
+            Destroy(t);
+        }
+        // hide restart button and restore interactable start (RunGameWithHiddenSettings will restore full UI)
+        if (restartButtonGO != null)
+        {
+            restartButtonGO.SetActive(false);
+        }
     }
 
 
@@ -598,7 +806,10 @@ public class UIManager : MonoBehaviour
     public void Refresh(PokerGame g)
     {
         // Update UI to reflect current game state (players, community cards, winner).
-        if (g == null) return;
+        if (g == null)
+        {
+            return;
+        }
         // Prefer updating the Label child on our playerTextGOs so we target the right Text component
         if (playerTextGOs != null && playerTextGOs.Count > 0)
         {
@@ -606,14 +817,19 @@ public class UIManager : MonoBehaviour
             {
                 var go = playerTextGOs[i];
                 var label = go != null ? go.transform.Find("Label")?.GetComponent<Text>() ?? go.GetComponentInChildren<Text>() : null;
-                if (label == null) continue;
-
+                if (label == null)
+                {
+                    continue;
+                }
+                label.horizontalOverflow = HorizontalWrapMode.Overflow;
                 if (i < g.players.Count)
                 {
                     var p = g.players[i];
                     string holeStr = "";
                     if (p.hole != null && p.hole.Count >= 2)
+                    {
                         holeStr = $"{p.hole[0]} {p.hole[1]} ";
+                    }
                     label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
                 }
                 else
@@ -630,13 +846,18 @@ public class UIManager : MonoBehaviour
                 for (int i = 0; i < playerTexts.Length; i++)
                 {
                     var label = playerTexts[i];
-                    if (label == null) continue;
+                    if (label == null)
+                    {
+                        continue;
+                    }
                     if (i < g.players.Count)
                     {
                         var p = g.players[i];
                         string holeStr = "";
                         if (p.hole != null && p.hole.Count >= 2)
+                        {
                             holeStr = $"{p.hole[0]} {p.hole[1]} ";
+                        }
                         label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
                     }
                     else label.text = "";
@@ -652,8 +873,14 @@ public class UIManager : MonoBehaviour
         if (resultText != null)
         {
             int w = g.DetermineWinner();
-            if (w >= 0) resultText.text = "获胜者：玩家" + (w + 1);
-            else resultText.text = "";
+            if (w >= 0)
+            {
+                resultText.text = "获胜者：玩家" + (w + 1);
+            }
+            else
+            {
+                resultText.text = "";
+            }
         }
         if (potText != null)
         {
