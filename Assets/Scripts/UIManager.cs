@@ -222,7 +222,7 @@ public class UIManager : MonoBehaviour
         startButton.onClick.AddListener(OnStartClicked);
 
         // Restart button (initially hidden). Shown during a run to allow cancelling and returning to settings
-        restartButton = CreateButton("RestartButton", panelGO.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160, 28) * uiScale, new Color(0.9f, 0.2f, 0.2f), "Restart", font, Mathf.RoundToInt(16 * uiScale));
+        restartButton = CreateButton("RestartButton", panelGO.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -200f), new Vector2(160, 28) * uiScale, new Color(0.9f, 0.2f, 0.2f), "Restart", font, Mathf.RoundToInt(16 * uiScale));
         restartButtonGO = restartButton.gameObject;
         restartButton.onClick.AddListener(OnRestartClicked);
         restartButtonGO.SetActive(false);
@@ -241,7 +241,7 @@ public class UIManager : MonoBehaviour
         GameEventBus.Subscribe(Events.River, onRiverWrapper);
         GameEventBus.Subscribe(Events.HandStarted, onHandStartedWrapper);
         // Ensure we display player chip info if the game creates players slightly later
-        StartCoroutine(EnsureInitialPlayerInfo());
+        CoroutineTracker.Start(this, EnsureInitialPlayerInfo());
     }
 
     private IEnumerator EnsureInitialPlayerInfo()
@@ -252,15 +252,14 @@ public class UIManager : MonoBehaviour
         {
             if (game != null && game.players != null && game.players.Count > 0)
             {
-                // rebuild to match actual player count and refresh visible info
+                // rebuild to match actual player count and subscribe to data-driven updates
                 RebuildPlayerTextFields(game.players.Count, uiFont, uiScale);
-                Refresh(game);
                 yield break;
             }
             yield return null;
         }
-        // final attempt: refresh with what we have
-        Refresh(game);
+        // final attempt: subscribe and update with what we have
+        SubscribeAllPlayerData();
     }
 
     private IEnumerator FadeInCanvasGroup(CanvasGroup cg, float dur)
@@ -341,24 +340,24 @@ public class UIManager : MonoBehaviour
             Vector2 target = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
 
             // start movement coroutine
-            StartCoroutine(MoveRectTo(rt, target, dur));
+            CoroutineTracker.Start(this, MoveRectTo(rt, target, dur));
 
             // rotate whole object so card faces center
             float bgRot = angleDeg - 90f;
-            StartCoroutine(RotateRectTo(rt, bgRot, dur));
+            CoroutineTracker.Start(this, RotateRectTo(rt, bgRot, dur));
 
             // ensure label upright: set child Label rotation to 0 over same duration
             var labelTf = rt.transform.Find("Label");
             if (labelTf != null)
             {
-                StartCoroutine(RotateRectTo(labelTf.GetComponent<RectTransform>(), 0f, dur));
+                CoroutineTracker.Start(this, RotateRectTo(labelTf.GetComponent<RectTransform>(), 0f, dur));
             }
 
             // fade in if needed
             var cg = rt.GetComponent<CanvasGroup>();
             if (cg != null)
             {
-                StartCoroutine(FadeInCanvasGroup(cg, dur * 0.8f));
+                CoroutineTracker.Start(this, FadeInCanvasGroup(cg, dur * 0.8f));
             }
         }
         yield return new WaitForSeconds(dur);
@@ -432,7 +431,7 @@ public class UIManager : MonoBehaviour
         playerTexts = labelsList.ToArray();
 
         // Arrange and animate to circular positions
-        StartCoroutine(ArrangePlayersSmooth(playerTextGOs, uiScale, 0.35f));
+        CoroutineTracker.Start(this, ArrangePlayersSmooth(playerTextGOs, uiScale, 0.35f));
 
         // Ensure community/result/pot/params placed relative to center
         if (communityText != null)
@@ -471,6 +470,7 @@ public class UIManager : MonoBehaviour
 
     void OnDestroy()
     {
+        UnsubscribeAllPlayerData();
         // Clean up subscriptions
         if (onFlopWrapper != null)
         {
@@ -511,16 +511,15 @@ public class UIManager : MonoBehaviour
             return;
         }
         // Incrementally append added cards to the communityText, then do a full refresh
-        if (communityText != null && tpl.Item2 != null && tpl.Item2.Count > 0)
+
+        StringBuilder sb = new StringBuilder();
+        foreach (var c in tpl.Item1)
         {
-            var sb = new StringBuilder(communityText.text ?? "");
-            foreach (var c in tpl.Item2)
-            {
-                sb.Append(c).Append(' ');
-            }
-            communityText.text = sb.ToString();
+            sb.Append(c).Append(' ');
         }
-        Refresh(game);
+        communityText.text = sb.ToString();
+
+        // UI updates driven by data subscriptions; only community text needed here
     }
 
     private void OnHandStarted(List<Player> players)
@@ -531,7 +530,8 @@ public class UIManager : MonoBehaviour
         {
             RebuildPlayerTextFields(cnt, uiFont, uiScale);
         }
-        Refresh(game);
+        // subscribe to per-player data changes and update UI
+        SubscribeAllPlayerData();
     }
 
     // These object-typed wrappers are stored as delegates to allow reliable Unsubscribe
@@ -539,6 +539,81 @@ public class UIManager : MonoBehaviour
     private Action<object> onTurnWrapper;
     private Action<object> onRiverWrapper;
     private Action<object> onHandStartedWrapper;
+
+    // Per-player data subscriptions so we can unsubscribe later
+    private class DataSubs { public Action<int, int> stack; public Action<List<Card>, List<Card>> hole; public Action<int, int> bet; public Action<bool, bool> folded; public Action<bool, bool> allin; }
+    private List<DataSubs> dataSubs = new List<DataSubs>();
+
+    private void UnsubscribeAllPlayerData()
+    {
+        if (game == null || game.players == null) return;
+        for (int i = 0; i < dataSubs.Count && i < game.players.Count; i++)
+        {
+            var p = game.players[i];
+            var s = dataSubs[i];
+            if (s == null || p == null) continue;
+            if (s.stack != null) p.data.StackData.OnValueChanged -= s.stack;
+            if (s.hole != null) p.data.HoleData.OnValueChanged -= s.hole;
+            if (s.bet != null) p.data.CurrentBetData.OnValueChanged -= s.bet;
+            if (s.folded != null) p.data.FoldedData.OnValueChanged -= s.folded;
+            if (s.allin != null) p.data.AllInData.OnValueChanged -= s.allin;
+        }
+        dataSubs.Clear();
+    }
+
+    private void SubscribeAllPlayerData()
+    {
+        UnsubscribeAllPlayerData();
+        if (game == null || game.players == null) return;
+        for (int i = 0; i < game.players.Count; i++)
+        {
+            var p = game.players[i];
+            var s = new DataSubs();
+            int idx = i;
+            s.stack = (oldv, newv) => UpdatePlayerLabel(idx);
+            s.hole = (oldv, newv) => UpdatePlayerLabel(idx);
+            s.bet = (oldv, newv) => { UpdatePlayerLabel(idx); UpdatePotText(game.pot); };
+            s.folded = (oldv, newv) => UpdatePlayerLabel(idx);
+            s.allin = (oldv, newv) => UpdatePlayerLabel(idx);
+            p.data.StackData.OnValueChanged += s.stack;
+            p.data.HoleData.OnValueChanged += s.hole;
+            p.data.CurrentBetData.OnValueChanged += s.bet;
+            p.data.FoldedData.OnValueChanged += s.folded;
+            p.data.AllInData.OnValueChanged += s.allin;
+            dataSubs.Add(s);
+        }
+        // initial update
+        for (int i = 0; i < game.players.Count && i < playerTextGOs.Count; i++) UpdatePlayerLabel(i);
+        UpdatePotText(game.pot);
+    }
+
+    private void UpdatePlayerLabel(int i)
+    {
+        if (game == null || game.players == null) return;
+        if (i < 0 || i >= game.players.Count) return;
+        if (playerTextGOs == null || i >= playerTextGOs.Count) return;
+        var p = game.players[i];
+        var label = playerTextGOs[i].transform.Find("Label")?.GetComponent<Text>() ?? playerTextGOs[i].GetComponentInChildren<Text>();
+        if (label == null) return;
+        string holeStr = "";
+        var holeList = p.data.Hole;
+        if (holeList != null && holeList.Count >= 2)
+        {
+            holeStr = $"{holeList[0]} {holeList[1]} ";
+        }
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.text = $"{p.name}：{holeStr}筹码：{p.data.Stack}";
+    }
+
+    private void UpdatePotText(int pot)
+    {
+        if (potText != null) potText.text = "底池：" + pot.ToString();
+    }
+
+    public void UpdatePot(int pot)
+    {
+        UpdatePotText(pot);
+    }
 
     public void OnDealClicked()
     {
@@ -549,8 +624,8 @@ public class UIManager : MonoBehaviour
     private void OnStartClicked()
     {
 
-        // Refresh UI
-        Refresh(game);
+        // Subscribe to player data and update UI
+        SubscribeAllPlayerData();
 
         // Build or reuse an AIConfig to pass to the test/run
         AIConfig cfg = null;
@@ -604,7 +679,7 @@ public class UIManager : MonoBehaviour
         // Create and run the test runner while hiding settings
         var tester = new GameObject("Test");
         var flowTest = tester.AddComponent<PokerGameFlowTest>();
-        StartCoroutine(RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
+        CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
     }
 
     // Hide settings while the provided inner routine runs, then restore UI
@@ -624,7 +699,7 @@ public class UIManager : MonoBehaviour
         currentRunCoroutine = null;
         if (inner != null)
         {
-            currentRunCoroutine = StartCoroutine(RunInnerAndMark(inner));
+            currentRunCoroutine = CoroutineTracker.Start(this, RunInnerAndMark(inner));
             while (!currentRunFinished)
             {
                 yield return null;
@@ -634,7 +709,7 @@ public class UIManager : MonoBehaviour
         // cleanup
         if (currentRunCoroutine != null)
         {
-            StopCoroutine(currentRunCoroutine);
+            CoroutineTracker.Stop(this, currentRunCoroutine);
             currentRunCoroutine = null;
         }
 
@@ -660,7 +735,7 @@ public class UIManager : MonoBehaviour
         // Cancel running test and return to settings
         if (currentRunCoroutine != null)
         {
-            StopCoroutine(currentRunCoroutine);
+            CoroutineTracker.Stop(this, currentRunCoroutine);
             currentRunCoroutine = null;
         }
         currentRunFinished = true;
@@ -772,89 +847,6 @@ public class UIManager : MonoBehaviour
         return slider;
     }
 
-    public void Refresh(PokerGame g)
-    {
-        // Update UI to reflect current game state (players, community cards, winner).
-        if (g == null)
-        {
-            return;
-        }
-        // Prefer updating the Label child on our playerTextGOs so we target the right Text component
-        if (playerTextGOs != null && playerTextGOs.Count > 0)
-        {
-            for (int i = 0; i < playerTextGOs.Count; i++)
-            {
-                var go = playerTextGOs[i];
-                var label = go != null ? go.transform.Find("Label")?.GetComponent<Text>() ?? go.GetComponentInChildren<Text>() : null;
-                if (label == null)
-                {
-                    continue;
-                }
-                label.horizontalOverflow = HorizontalWrapMode.Overflow;
-                if (i < g.players.Count)
-                {
-                    var p = g.players[i];
-                    string holeStr = "";
-                    if (p.hole != null && p.hole.Count >= 2)
-                    {
-                        holeStr = $"{p.hole[0]} {p.hole[1]} ";
-                    }
-                    label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
-                }
-                else
-                {
-                    label.text = "";
-                }
-            }
-        }
-        else
-        {
-            // fallback to old array if present
-            if (playerTexts != null)
-            {
-                for (int i = 0; i < playerTexts.Length; i++)
-                {
-                    var label = playerTexts[i];
-                    if (label == null)
-                    {
-                        continue;
-                    }
-                    if (i < g.players.Count)
-                    {
-                        var p = g.players[i];
-                        string holeStr = "";
-                        if (p.hole != null && p.hole.Count >= 2)
-                        {
-                            holeStr = $"{p.hole[0]} {p.hole[1]} ";
-                        }
-                        label.text = $"{p.name}：{holeStr}筹码：{p.stack}";
-                    }
-                    else label.text = "";
-                }
-            }
-        }
-        if (communityText != null)
-        {
-            var sb = new StringBuilder();
-            foreach (var c in g.community) sb.Append(c).Append(' ');
-            communityText.text = sb.ToString();
-        }
-        if (resultText != null)
-        {
-            int w = g.DetermineWinner();
-            if (w >= 0)
-            {
-                resultText.text = "获胜者：玩家" + (w + 1);
-            }
-            else
-            {
-                resultText.text = "";
-            }
-        }
-        if (potText != null)
-        {
-            potText.text = "底池：" + g.pot.ToString();
-        }
-    }
+    // Refresh removed: UI now updates from PlayData events and GameEventBus for community.
 }
 

@@ -18,6 +18,9 @@ public class PokerGame : MonoBehaviour
     public UIManager ui;
     public AIConfig aiConfig;
 
+    // Tracked coroutines so we can stop them when this object is destroyed
+    private List<Coroutine> trackedCoroutines = new List<Coroutine>();
+
     public int dealerIndex = 0;
     public int smallBlindAmount = 5;
     public int bigBlindAmount = 10;
@@ -30,6 +33,44 @@ public class PokerGame : MonoBehaviour
 
     void Start() { }
 
+    private Coroutine StartTrackedCoroutine(System.Collections.IEnumerator routine)
+    {
+        Coroutine handle = null;
+        System.Collections.IEnumerator Wrapper()
+        {
+            yield return routine;
+            // remove when finished
+            trackedCoroutines.Remove(handle);
+        }
+        handle = StartCoroutine(Wrapper());
+        trackedCoroutines.Add(handle);
+        return handle;
+    }
+
+    public void StopTrackedCoroutine(Coroutine c)
+    {
+        if (c == null) return;
+        try { StopCoroutine(c); } catch { }
+        trackedCoroutines.Remove(c);
+    }
+
+    public void StopAllTrackedCoroutines()
+    {
+        foreach (var c in trackedCoroutines.ToList())
+        {
+            if (c != null)
+            {
+                try { StopCoroutine(c); } catch { }
+            }
+        }
+        trackedCoroutines.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        StopAllTrackedCoroutines();
+    }
+
 
     public System.Collections.IEnumerator StartHandRoutine()
     {
@@ -40,7 +81,7 @@ public class PokerGame : MonoBehaviour
         }
 
         foreach (var p in players) p.ResetForHand();
-        foreach (var p in players) p.aggression = UnityEngine.Random.Range(0.2f, 1.5f);
+        foreach (var p in players) p.data.Aggression = UnityEngine.Random.Range(0.2f, 1.5f);
 
         deck = new Deck();
         deck.Shuffle();
@@ -50,8 +91,8 @@ public class PokerGame : MonoBehaviour
 
         for (int i = 0; i < numPlayers; i++)
         {
-            players[i].hole.Add(deck.Draw());
-            players[i].hole.Add(deck.Draw());
+            players[i].data.AddHole(deck.Draw());
+            players[i].data.AddHole(deck.Draw());
         }
 
         PostBlinds();
@@ -60,7 +101,7 @@ public class PokerGame : MonoBehaviour
         // Preflop
         phase = Phase.Preflop;
         Debug.Log("--- Preflop: 开始下注轮 ---");
-        yield return StartCoroutine(RunBettingRound(GetFirstToActAfterBigBlind()));
+        yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterBigBlind()));
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
@@ -72,7 +113,7 @@ public class PokerGame : MonoBehaviour
             currentBet = 0;
             Debug.Log("--- Flop: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(community.ToList(), flopAdded));
-            yield return StartCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -85,7 +126,7 @@ public class PokerGame : MonoBehaviour
             currentBet = 0;
             Debug.Log("--- Turn: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(community.ToList(), turnAdded));
-            yield return StartCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -98,7 +139,7 @@ public class PokerGame : MonoBehaviour
             currentBet = 0;
             Debug.Log("--- River: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(community.ToList(), riverAdded));
-            yield return StartCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
         // Showdown & payout
@@ -114,20 +155,24 @@ public class PokerGame : MonoBehaviour
             foreach (int pid in elig)
             {
                 var p = players[pid];
-                if (p.folded) continue;
-                var all = new List<Card>(); all.AddRange(p.hole); all.AddRange(community);
+                if (p.data.Folded) continue;
+                var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(community);
                 long sc = HandEvaluator.EvaluateBest(all);
                 if (sc > best) { best = sc; winners.Clear(); winners.Add(pid); }
                 else if (sc == best) winners.Add(pid);
             }
             if (winners.Count == 0) continue;
             int share = amount / winners.Count;
-            foreach (var w in winners) players[w].stack += share;
+            foreach (var w in winners)
+            {
+                var pd = players[w].data;
+                pd.Stack = pd.Stack + share;
+            }
         }
 
-        foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.stack}");
+        foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.data.Stack}");
 
-        ui?.Refresh(this);
+        ui?.UpdatePot(pot);
 
         dealerIndex = (dealerIndex + 1) % numPlayers;
         yield break;
@@ -140,11 +185,13 @@ public class PokerGame : MonoBehaviour
         var sPlayer = players[sb];
         var bPlayer = players[bb];
 
-        int postedSB = Mathf.Min(sPlayer.stack, smallBlindAmount);
-        sPlayer.stack -= postedSB; sPlayer.currentBet += postedSB;
+        int postedSB = Mathf.Min(sPlayer.data.Stack, smallBlindAmount);
+        sPlayer.data.Stack = sPlayer.data.Stack - postedSB;
+        sPlayer.data.CurrentBet = sPlayer.data.CurrentBet + postedSB;
 
-        int postedBB = Mathf.Min(bPlayer.stack, bigBlindAmount);
-        bPlayer.stack -= postedBB; bPlayer.currentBet += postedBB;
+        int postedBB = Mathf.Min(bPlayer.data.Stack, bigBlindAmount);
+        bPlayer.data.Stack = bPlayer.data.Stack - postedBB;
+        bPlayer.data.CurrentBet = bPlayer.data.CurrentBet + postedBB;
 
         currentBet = postedBB;
         Debug.Log($"Blinds: P{sb + 1} posts SB={postedSB}, P{bb + 1} posts BB={postedBB}");
@@ -153,8 +200,8 @@ public class PokerGame : MonoBehaviour
     private int GetFirstToActAfterBigBlind() => (dealerIndex + 3) % numPlayers;
     private int GetFirstToActAfterDealer() => (dealerIndex + 1) % numPlayers;
 
-    private int ActivePlayersCount() => players.Count(p => !p.folded);
-    private int ActivePlayersCountExcludingAllIn() => players.Count(p => !p.folded && !p.allIn && p.stack > 0);
+    private int ActivePlayersCount() => players.Count(p => !p.data.Folded);
+    private int ActivePlayersCountExcludingAllIn() => players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
 
     private System.Collections.IEnumerator RunBettingRound(int startIndex)
     {
@@ -169,10 +216,9 @@ public class PokerGame : MonoBehaviour
             {
                 int idx = (startIndex + i) % n;
                 var p = players[idx];
-                if (p.folded || p.allIn)
+                if (p.data.Folded || p.data.AllIn)
                     continue;
-
-                int need = currentBet - p.currentBet;
+                int need = currentBet - p.data.CurrentBet;
                 if (PlayerAI.Act(p, this, need))
                     changed = true;
 
@@ -184,7 +230,7 @@ public class PokerGame : MonoBehaviour
             }
             yield return null;
         }
-        pot = players.Sum(p => p.currentBet);
+        pot = players.Sum(p => p.data.CurrentBet);
         Debug.Log($"下注轮结束。已投入彩池={pot}");
         yield break;
     }
@@ -192,7 +238,7 @@ public class PokerGame : MonoBehaviour
     private List<(int amount, List<int> eligible)> CollectPots()
     {
         var pots = new List<(int amount, List<int> eligible)>();
-        var bets = players.Select(p => p.currentBet).ToArray();
+        var bets = players.Select(p => p.data.CurrentBet).ToArray();
         while (bets.Any(b => b > 0))
         {
             int min = bets.Where(b => b > 0).Min();
@@ -203,7 +249,7 @@ public class PokerGame : MonoBehaviour
             pots.Add((amount, eligible));
             for (int i = 0; i < bets.Length; i++) if (bets[i] > 0) bets[i] = Math.Max(0, bets[i] - min);
         }
-        foreach (var p in players) p.currentBet = 0;
+        foreach (var p in players) p.data.CurrentBet = 0;
         return pots;
     }
 
@@ -212,8 +258,8 @@ public class PokerGame : MonoBehaviour
         long bestScore = -1; int bestIdx = -1;
         for (int i = 0; i < players.Count; i++)
         {
-            var p = players[i]; if (p.folded) continue;
-            var all = new List<Card>(); all.AddRange(p.hole); all.AddRange(community);
+            var p = players[i]; if (p.data.Folded) continue;
+            var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(community);
             long sc = HandEvaluator.EvaluateBest(all);
             if (sc > bestScore) { bestScore = sc; bestIdx = i; }
         }

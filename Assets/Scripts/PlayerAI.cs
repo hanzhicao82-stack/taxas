@@ -15,7 +15,7 @@ public static class PlayerAI
     /// </summary>
     public static bool Act(Player p, PokerGame game, int need)
     {
-        if (p.folded || p.allIn) return false;
+        if (p.data.Folded || p.data.AllIn) return false;
         var cfg = game.aiConfig;
         // fallback defaults if no config provided
         float raiseProb = cfg != null ? cfg.raiseProbability : 0.12f;
@@ -30,19 +30,19 @@ public static class PlayerAI
         // Need to call or fold/all-in
         if (need > 0)
         {
-            if (p.stack <= need)
+            if (p.data.Stack <= need)
             {
                 // 筹码不足则全下
-                p.currentBet += p.stack;
-                p.stack = 0;
-                p.allIn = true;
-                Debug.Log($"P{p.id + 1} 全下 {p.currentBet}");
+                p.data.CurrentBet = p.data.CurrentBet + p.data.Stack;
+                p.data.Stack = 0;
+                p.data.AllIn = true;
+                Debug.Log($"P{p.id + 1} 全下 {p.data.CurrentBet}");
                 return true;
             }
             else
             {
                 // 使用胜率与底池赔率决定动作
-                int potNow = game.players.Sum(x => x.currentBet);
+                int potNow = game.players.Sum(x => x.data.CurrentBet);
                 float potOdds = (float)need / (float)(potNow + need);
 
                 // 若胜率远低于底池赔率，则弃牌
@@ -51,29 +51,29 @@ public static class PlayerAI
                 bool isPreflop = (game.community == null || game.community.Count == 0);
                 if (isPreflop)
                     foldFactor *= 0.3f; // 在翻牌前更宽松
-                foldFactor /= Mathf.Clamp(p.aggression, 0.5f, 2.0f); // aggression 越高，foldFactor 越小（更少弃牌）
+                foldFactor /= Mathf.Clamp(p.data.Aggression, 0.5f, 2.0f); // aggression 越高，foldFactor 越小（更少弃牌）
                 if (winProb < potOdds * foldFactor)
                 {
-                    p.folded = true;
+                    p.data.Folded = true;
                     Debug.Log($"P{p.id + 1} 弃牌 (胜率={winProb:F2} 底池赔率={potOdds:F2} 阈值={potOdds * foldFactor:F2})");
                     return true;
                 }
 
                 // 若胜率显著高于底池赔率且概率触发，则尝试加注
-                if (winProb > potOdds * 1.6f && UnityEngine.Random.value < raiseProb * p.aggression && p.stack > need + game.bigBlindAmount)
+                if (winProb > potOdds * 1.6f && UnityEngine.Random.value < raiseProb * p.data.Aggression && p.data.Stack > need + game.bigBlindAmount)
                 {
-                    int raise = Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (raiseBase + (p.aggression - 1f) * raiseScale)));
+                    int raise = Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (raiseBase + (p.data.Aggression - 1f) * raiseScale)));
                     raise = Mathf.Max(raise, Mathf.FloorToInt(game.bigBlindAmount * minRaiseFrac));
-                    p.stack -= (need + raise);
-                    p.currentBet += (need + raise);
-                    game.currentBet = p.currentBet;
+                    p.data.Stack = p.data.Stack - (need + raise);
+                    p.data.CurrentBet = p.data.CurrentBet + (need + raise);
+                    game.currentBet = p.data.CurrentBet;
                     Debug.Log($"P{p.id + 1} 加注 {raise}, 新当前注额={game.currentBet} (胜率={winProb:F2})");
                     return true;
                 }
 
                 // 否则跟注
-                p.stack -= need;
-                p.currentBet += need;
+                p.data.Stack = p.data.Stack - need;
+                p.data.CurrentBet = p.data.CurrentBet + need;
                 Debug.Log($"P{p.id + 1} 跟注 {need} (胜率={winProb:F2} 底池赔率={potOdds:F2})");
                 return true;
             }
@@ -81,14 +81,14 @@ public static class PlayerAI
         else
         {
             // 无需跟注：根据胜率决定是否下注
-            if (p.stack > 0 && UnityEngine.Random.value < betProb * p.aggression * Mathf.Clamp01(winProb + 0.1f))
+            if (p.data.Stack > 0 && UnityEngine.Random.value < betProb * p.data.Aggression * Mathf.Clamp01(winProb + 0.1f))
             {
-                int bet = Mathf.Min(game.bigBlindAmount, p.stack);
-                int extra = UnityEngine.Random.Range(0, Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (p.aggression - 1f))));
-                bet = Mathf.Min(p.stack, bet + extra);
-                p.stack -= bet;
-                p.currentBet += bet;
-                game.currentBet = p.currentBet;
+                int bet = Mathf.Min(game.bigBlindAmount, p.data.Stack);
+                int extra = UnityEngine.Random.Range(0, Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (p.data.Aggression - 1f))));
+                bet = Mathf.Min(p.data.Stack, bet + extra);
+                p.data.Stack = p.data.Stack - bet;
+                p.data.CurrentBet = p.data.CurrentBet + bet;
+                game.currentBet = p.data.CurrentBet;
                 Debug.Log($"P{p.id + 1} 下注 {bet} (胜率={winProb:F2})");
                 return true;
             }
@@ -110,7 +110,7 @@ public static class PlayerAI
 
         // Remove hero hole and community from available pool
         var known = new System.Collections.Generic.List<Card>();
-        known.AddRange(hero.hole);
+        known.AddRange(hero.data.Hole ?? new List<Card>());
         known.AddRange(game.community);
         // Remove by matching rank+suit
         foreach (var k in known)
@@ -125,7 +125,7 @@ public static class PlayerAI
             }
         }
 
-        int opponents = game.players.Count(p => !p.folded && p != hero);
+        int opponents = game.players.Count(p => !p.data.Folded && p != hero);
         if (opponents <= 0) return 1.0f;
 
         int needCommunity = Math.Max(0, 5 - game.community.Count);
@@ -158,7 +158,7 @@ public static class PlayerAI
 
             // evaluate hero
             var heroAll = new System.Collections.Generic.List<Card>();
-            heroAll.AddRange(hero.hole);
+            heroAll.AddRange(hero.data.Hole ?? new List<Card>());
             heroAll.AddRange(communityComplete);
             long heroScore = HandEvaluator.EvaluateBest(heroAll);
 

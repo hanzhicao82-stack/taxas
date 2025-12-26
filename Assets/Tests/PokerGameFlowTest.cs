@@ -21,6 +21,7 @@ public class PokerGameFlowTest : MonoBehaviour
 
         // 创建并配置 PokerGame
         var go = new GameObject("PokerGameTestRunner");
+        go.transform.parent = transform;
         var game = go.AddComponent<PokerGame>();
         game.numPlayers = numPlayers;
         game.aiConfig = config;
@@ -30,11 +31,11 @@ public class PokerGameFlowTest : MonoBehaviour
         for (int i = 0; i < numPlayers; i++)
         {
             var p = new Player(i, "P" + (i + 1));
-            p.stack = 1000; // 每位玩家初始筹码
+            p.data.Stack = 1000; // 每位玩家初始筹码
             game.players.Add(p);
         }
 
-        int initialTotal = game.players.Sum(p => p.stack);
+        int initialTotal = game.players.Sum(p => p.data.Stack);
         Debug.Log($"Initial total chips = {initialTotal}");
 
         // 运行若干手牌并在每手后检查基本不变量（每手之间让出一帧，避免阻塞主线程）
@@ -43,7 +44,7 @@ public class PokerGameFlowTest : MonoBehaviour
             // 使用带超时保护的执行，防止任意一手因 AI/逻辑问题卡住整个测试
             float timeoutSec = 60f; // 超时阈值，可根据需要调整
             bool completed = false;
-            yield return StartCoroutine(RunWithTimeout(game.StartHandRoutine(), timeoutSec, (ok) => completed = ok));
+            yield return CoroutineTracker.Start(this, RunWithTimeout(game.StartHandRoutine(), timeoutSec, (ok) => completed = ok));
 
             if (!completed)
             {
@@ -51,7 +52,7 @@ public class PokerGameFlowTest : MonoBehaviour
                 break;
             }
 
-            int total = game.players.Sum(p => p.stack);
+            int total = game.players.Sum(p => p.data.Stack);
             if (total != initialTotal)
             {
                 Debug.LogError($"[FAIL] Chips not conserved after hand {h + 1}: expected {initialTotal}, got {total}");
@@ -107,7 +108,7 @@ public class PokerGameFlowTest : MonoBehaviour
             var yielded = enumerator.Current;
             if (yielded is IEnumerator nested)
             {
-                yield return StartCoroutine(RunWithTimeout(nested, timeoutSeconds - (Time.realtimeSinceStartup - start), callback));
+                yield return CoroutineTracker.Start(this, RunWithTimeout(nested, timeoutSeconds - (Time.realtimeSinceStartup - start), callback));
                 // If nested timed out (callback false) then propagate timeout
                 // Note: callback may have been invoked by nested; check elapsed
                 if (Time.realtimeSinceStartup - start > timeoutSeconds)
