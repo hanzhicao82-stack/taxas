@@ -48,7 +48,7 @@ public static class PlayerAI
                 // 若胜率远低于底池赔率，则弃牌
                 // 调整弃牌阈值：在 Preflop（无公共牌）时放宽阈值；同时依据玩家 aggression 调整（更激进的玩家更少弃牌）
                 float foldFactor = 0.85f;
-                bool isPreflop = (game.community == null || game.community.Count == 0);
+                bool isPreflop = (game.data.Community == null || game.data.Community.Count == 0);
                 if (isPreflop)
                     foldFactor *= 0.3f; // 在翻牌前更宽松
                 foldFactor /= Mathf.Clamp(p.data.Aggression, 0.5f, 2.0f); // aggression 越高，foldFactor 越小（更少弃牌）
@@ -60,13 +60,13 @@ public static class PlayerAI
                 }
 
                 // 若胜率显著高于底池赔率且概率触发，则尝试加注
-                if (winProb > potOdds * 1.6f && UnityEngine.Random.value < raiseProb * p.data.Aggression && p.data.Stack > need + game.bigBlindAmount)
+                if (winProb > potOdds * 1.6f && UnityEngine.Random.value < raiseProb * p.data.Aggression && p.data.Stack > need + game.data.BigBlindAmount)
                 {
-                    int raise = Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (raiseBase + (p.data.Aggression - 1f) * raiseScale)));
-                    raise = Mathf.Max(raise, Mathf.FloorToInt(game.bigBlindAmount * minRaiseFrac));
+                    int raise = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * (raiseBase + (p.data.Aggression - 1f) * raiseScale)));
+                    raise = Mathf.Max(raise, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
                     p.data.Stack = p.data.Stack - (need + raise);
                     p.data.CurrentBet = p.data.CurrentBet + (need + raise);
-                    game.currentBet = p.data.CurrentBet;
+                    game.data.CurrentBet = p.data.CurrentBet;
                     Debug.Log($"P{p.id + 1} 加注 {raise}, 新当前注额={game.currentBet} (胜率={winProb:F2})");
                     return true;
                 }
@@ -83,12 +83,12 @@ public static class PlayerAI
             // 无需跟注：根据胜率决定是否下注
             if (p.data.Stack > 0 && UnityEngine.Random.value < betProb * p.data.Aggression * Mathf.Clamp01(winProb + 0.1f))
             {
-                int bet = Mathf.Min(game.bigBlindAmount, p.data.Stack);
-                int extra = UnityEngine.Random.Range(0, Mathf.Max(1, Mathf.FloorToInt(game.bigBlindAmount * (p.data.Aggression - 1f))));
+                int bet = Mathf.Min(game.data.BigBlindAmount, p.data.Stack);
+                int extra = UnityEngine.Random.Range(0, Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * (p.data.Aggression - 1f))));
                 bet = Mathf.Min(p.data.Stack, bet + extra);
                 p.data.Stack = p.data.Stack - bet;
                 p.data.CurrentBet = p.data.CurrentBet + bet;
-                game.currentBet = p.data.CurrentBet;
+                game.data.CurrentBet = p.data.CurrentBet;
                 Debug.Log($"P{p.id + 1} 下注 {bet} (胜率={winProb:F2})");
                 return true;
             }
@@ -111,7 +111,7 @@ public static class PlayerAI
         // Remove hero hole and community from available pool
         var known = new System.Collections.Generic.List<Card>();
         known.AddRange(hero.data.Hole ?? new List<Card>());
-        known.AddRange(game.community);
+        known.AddRange(game.data.Community);
         // Remove by matching rank+suit
         foreach (var k in known)
         {
@@ -128,7 +128,7 @@ public static class PlayerAI
         int opponents = game.players.Count(p => !p.data.Folded && p != hero);
         if (opponents <= 0) return 1.0f;
 
-        int needCommunity = Math.Max(0, 5 - game.community.Count);
+        int needCommunity = Math.Max(0, 5 - game.data.Community.Count);
         int winsNumeratorScaled = 0;
         var rnd = new System.Random();
 
@@ -153,7 +153,7 @@ public static class PlayerAI
             }
 
             // complete community
-            var communityComplete = new System.Collections.Generic.List<Card>(game.community);
+            var communityComplete = new System.Collections.Generic.List<Card>(game.data.Community);
             for (int k = 0; k < needCommunity; k++) communityComplete.Add(pool[pos++]);
 
             // evaluate hero

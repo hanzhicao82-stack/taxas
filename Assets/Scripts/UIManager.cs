@@ -212,9 +212,9 @@ public class UIManager : MonoBehaviour
 
         numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, out numPlayersLabel, "玩家数", font, uiScale);
         numPlayersSlider.wholeNumbers = true;
-        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.smallBlindAmount : 5f, out smallBlindLabel, "小盲注", font, uiScale);
+        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.data.SmallBlindAmount : 5f, out smallBlindLabel, "小盲注", font, uiScale);
         smallBlindSlider.wholeNumbers = true;
-        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.bigBlindAmount : 10f, out bigBlindLabel, "大盲注", font, uiScale);
+        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.data.BigBlindAmount : 10f, out bigBlindLabel, "大盲注", font, uiScale);
         bigBlindSlider.wholeNumbers = true;
 
         // Start button (use helper)
@@ -572,7 +572,7 @@ public class UIManager : MonoBehaviour
             int idx = i;
             s.stack = (oldv, newv) => UpdatePlayerLabel(idx);
             s.hole = (oldv, newv) => UpdatePlayerLabel(idx);
-            s.bet = (oldv, newv) => { UpdatePlayerLabel(idx); UpdatePotText(game.pot); };
+            s.bet = (oldv, newv) => { UpdatePlayerLabel(idx); UpdatePotText(game.data.Pot); };
             s.folded = (oldv, newv) => UpdatePlayerLabel(idx);
             s.allin = (oldv, newv) => UpdatePlayerLabel(idx);
             p.data.StackData.OnValueChanged += s.stack;
@@ -584,7 +584,7 @@ public class UIManager : MonoBehaviour
         }
         // initial update
         for (int i = 0; i < game.players.Count && i < playerTextGOs.Count; i++) UpdatePlayerLabel(i);
-        UpdatePotText(game.pot);
+        UpdatePotText(game.data.Pot);
     }
 
     private void UpdatePlayerLabel(int i)
@@ -666,13 +666,13 @@ public class UIManager : MonoBehaviour
 
         // Apply number of players and blinds to the active game if present
         int players = (numPlayersSlider != null) ? Mathf.RoundToInt(numPlayersSlider.value) : ((game != null) ? game.numPlayers : 4);
-        int small = (smallBlindSlider != null) ? Mathf.RoundToInt(smallBlindSlider.value) : ((game != null) ? game.smallBlindAmount : 5);
-        int big = (bigBlindSlider != null) ? Mathf.RoundToInt(bigBlindSlider.value) : ((game != null) ? game.bigBlindAmount : 10);
+        int small = (smallBlindSlider != null) ? Mathf.RoundToInt(smallBlindSlider.value) : ((game != null) ? game.data.SmallBlindAmount : 5);
+        int big = (bigBlindSlider != null) ? Mathf.RoundToInt(bigBlindSlider.value) : ((game != null) ? game.data.BigBlindAmount : 10);
         if (game != null)
         {
             game.numPlayers = players;
-            game.smallBlindAmount = small;
-            game.bigBlindAmount = big;
+            game.data.SmallBlindAmount = small;
+            game.data.BigBlindAmount = big;
             game.aiConfig = cfg;
         }
 

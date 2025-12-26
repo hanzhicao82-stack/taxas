@@ -12,7 +12,7 @@ public class PokerGame : MonoBehaviour
 {
     public int numPlayers = 4;
     public List<Player> players = new List<Player>();
-    public List<Card> community = new List<Card>();
+    public PokerData data = new PokerData();
 
     private Deck deck;
     public UIManager ui;
@@ -85,9 +85,9 @@ public class PokerGame : MonoBehaviour
 
         deck = new Deck();
         deck.Shuffle();
-        community.Clear();
-        pot = 0;
-        currentBet = 0;
+        data.ClearCommunity();
+        data.Pot = 0;
+        data.CurrentBet = 0;
 
         for (int i = 0; i < numPlayers; i++)
         {
@@ -109,10 +109,10 @@ public class PokerGame : MonoBehaviour
             phase = Phase.Flop;
             deck.Draw(); // burn
             var flopAdded = new List<Card> { deck.Draw(), deck.Draw(), deck.Draw() };
-            community.AddRange(flopAdded);
-            currentBet = 0;
-            Debug.Log("--- Flop: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.Flop, Tuple.Create(community.ToList(), flopAdded));
+            data.Community.AddRange(flopAdded);
+            data.CurrentBet = 0;
+            Debug.Log("--- Flop: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
             yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
@@ -122,10 +122,10 @@ public class PokerGame : MonoBehaviour
             phase = Phase.Turn;
             deck.Draw(); // burn
             var turnAdded = new List<Card> { deck.Draw() };
-            community.AddRange(turnAdded);
-            currentBet = 0;
-            Debug.Log("--- Turn: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.Turn, Tuple.Create(community.ToList(), turnAdded));
+            data.Community.AddRange(turnAdded);
+            data.CurrentBet = 0;
+            Debug.Log("--- Turn: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
             yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
@@ -135,10 +135,10 @@ public class PokerGame : MonoBehaviour
             phase = Phase.River;
             deck.Draw(); // burn
             var riverAdded = new List<Card> { deck.Draw() };
-            community.AddRange(riverAdded);
-            currentBet = 0;
-            Debug.Log("--- River: " + string.Join(" ", community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.River, Tuple.Create(community.ToList(), riverAdded));
+            data.Community.AddRange(riverAdded);
+            data.CurrentBet = 0;
+            Debug.Log("--- River: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
             yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
         }
 
@@ -156,7 +156,7 @@ public class PokerGame : MonoBehaviour
             {
                 var p = players[pid];
                 if (p.data.Folded) continue;
-                var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(community);
+                var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(data.Community ?? new List<Card>());
                 long sc = HandEvaluator.EvaluateBest(all);
                 if (sc > best) { best = sc; winners.Clear(); winners.Add(pid); }
                 else if (sc == best) winners.Add(pid);
@@ -172,7 +172,7 @@ public class PokerGame : MonoBehaviour
 
         foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.data.Stack}");
 
-        ui?.UpdatePot(pot);
+        ui?.UpdatePot(data.Pot);
 
         dealerIndex = (dealerIndex + 1) % numPlayers;
         yield break;
@@ -185,15 +185,15 @@ public class PokerGame : MonoBehaviour
         var sPlayer = players[sb];
         var bPlayer = players[bb];
 
-        int postedSB = Mathf.Min(sPlayer.data.Stack, smallBlindAmount);
+        int postedSB = Mathf.Min(sPlayer.data.Stack, data.SmallBlindAmount);
         sPlayer.data.Stack = sPlayer.data.Stack - postedSB;
         sPlayer.data.CurrentBet = sPlayer.data.CurrentBet + postedSB;
 
-        int postedBB = Mathf.Min(bPlayer.data.Stack, bigBlindAmount);
+        int postedBB = Mathf.Min(bPlayer.data.Stack, data.BigBlindAmount);
         bPlayer.data.Stack = bPlayer.data.Stack - postedBB;
         bPlayer.data.CurrentBet = bPlayer.data.CurrentBet + postedBB;
 
-        currentBet = postedBB;
+        data.CurrentBet = postedBB;
         Debug.Log($"Blinds: P{sb + 1} posts SB={postedSB}, P{bb + 1} posts BB={postedBB}");
     }
 
@@ -230,8 +230,8 @@ public class PokerGame : MonoBehaviour
             }
             yield return null;
         }
-        pot = players.Sum(p => p.data.CurrentBet);
-        Debug.Log($"下注轮结束。已投入彩池={pot}");
+        data.Pot = players.Sum(p => p.data.CurrentBet);
+        Debug.Log($"下注轮结束。已投入彩池={data.Pot}");
         yield break;
     }
 
@@ -259,7 +259,7 @@ public class PokerGame : MonoBehaviour
         for (int i = 0; i < players.Count; i++)
         {
             var p = players[i]; if (p.data.Folded) continue;
-            var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(community);
+            var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(data.Community ?? new List<Card>());
             long sc = HandEvaluator.EvaluateBest(all);
             if (sc > bestScore) { bestScore = sc; bestIdx = i; }
         }
