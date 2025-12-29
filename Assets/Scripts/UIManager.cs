@@ -89,8 +89,7 @@ public class UIManager : MonoBehaviour
 
         // Create player text fields based on existing game.players if available
         playerTextGOs = new List<GameObject>();
-        int initialCount = (game != null && game.players != null) ? game.players.Count : playerCount;
-        RebuildPlayerTextFields(initialCount, font, uiScale);
+
 
         // Community text
         var cgo = new GameObject("CommunityText");
@@ -243,26 +242,11 @@ public class UIManager : MonoBehaviour
         GameEventBus.Subscribe(Events.River, onRiverWrapper);
         GameEventBus.Subscribe(Events.HandStarted, onHandStartedWrapper);
         // Ensure we display player chip info if the game creates players slightly later
-        CoroutineTracker.Start(this, EnsureInitialPlayerInfo());
+
+
     }
 
-    private IEnumerator EnsureInitialPlayerInfo()
-    {
-        float start = Time.realtimeSinceStartup;
-        float timeout = 2f;
-        while (Time.realtimeSinceStartup - start < timeout)
-        {
-            if (game != null && game.players != null && game.players.Count > 0)
-            {
-                // rebuild to match actual player count and subscribe to data-driven updates
-                RebuildPlayerTextFields(game.players.Count, uiFont, uiScale);
-                yield break;
-            }
-            yield return null;
-        }
-        // final attempt: subscribe and update with what we have
-        SubscribeAllPlayerData();
-    }
+
 
     private IEnumerator FadeInCanvasGroup(CanvasGroup cg, float dur)
     {
@@ -365,18 +349,17 @@ public class UIManager : MonoBehaviour
         yield return new WaitForSeconds(dur);
     }
 
-    // Recreate player text UI elements to match count and animate transitions
-    private void RebuildPlayerTextFields(int count, Font font, float uiScale)
-    {
-        if (playerTextGOs == null)
-        {
-            playerTextGOs = new List<GameObject>();
-        }
 
-        // create missing elements
-        for (int idx = playerTextGOs.Count; idx < count; idx++)
+    void BindPlayer(int idx, Player player)
+    {
+
+        if (playerTextGOs == null) playerTextGOs = new List<GameObject>();
+
+        // create a single missing entry if needed (one-at-a-time)
+        if (playerTextGOs.Count <= idx)
         {
-            var tgo = new GameObject($"PlayerText_{idx + 1}");
+            int newIdx = playerTextGOs.Count;
+            var tgo = new GameObject($"PlayerText_{newIdx + 1}");
             tgo.transform.SetParent(panelGO.transform, false);
             var rt = tgo.AddComponent<RectTransform>();
             rt.sizeDelta = new Vector2(170, 34) * uiScale;
@@ -396,8 +379,8 @@ public class UIManager : MonoBehaviour
             txtRt.anchorMin = new Vector2(0.5f, 0.5f); txtRt.anchorMax = new Vector2(0.5f, 0.5f); txtRt.pivot = new Vector2(0.5f, 0.5f);
             txtRt.sizeDelta = new Vector2(140, 28) * uiScale;
             var txt = txtGo.AddComponent<Text>();
-            txt.font = font; txt.fontSize = Mathf.RoundToInt(14 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.MiddleCenter;
-            txt.text = $"玩家{idx + 1}：";
+            txt.font = uiFont ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); txt.fontSize = Mathf.RoundToInt(14 * uiScale); txt.color = Color.white; txt.alignment = TextAnchor.MiddleCenter;
+            txt.text = $"玩家{newIdx + 1}：";
 
             // start at center
             var r = tgo.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f); r.pivot = new Vector2(0.5f, 0.5f); r.anchoredPosition = Vector2.zero;
@@ -408,18 +391,10 @@ public class UIManager : MonoBehaviour
             playerTextGOs.Add(tgo);
         }
 
-        // destroy extras
-        while (playerTextGOs.Count > count)
-        {
-            var last = playerTextGOs[playerTextGOs.Count - 1];
-            playerTextGOs.RemoveAt(playerTextGOs.Count - 1);
-            if (last != null)
-            {
-                Destroy(last);
-            }
-        }
+        // update the label for this player
+        UpdatePlayerLabel(idx);
 
-        // update label list
+        // refresh playerTexts array and base sizes/colors
         var labelsList = new List<Text>();
         for (int j = 0; j < playerTextGOs.Count; j++)
         {
@@ -432,7 +407,6 @@ public class UIManager : MonoBehaviour
         }
         playerTexts = labelsList.ToArray();
 
-        // store base font sizes and colors for highlighting
         playerBaseFontSizes = new int[playerTexts.Length];
         playerBaseColors = new Color[playerTexts.Length];
         for (int i = 0; i < playerTexts.Length; i++)
@@ -441,43 +415,12 @@ public class UIManager : MonoBehaviour
             playerBaseColors[i] = (playerTexts[i] != null) ? playerTexts[i].color : Color.white;
         }
 
-        // Arrange and animate to circular positions
-        CoroutineTracker.Start(this, ArrangePlayersSmooth(playerTextGOs, uiScale, 0.35f));
-
-        // Ensure community/result/pot/params placed relative to center
-        if (communityText != null)
-        {
-            var crt2 = communityText.GetComponent<RectTransform>();
-            if (crt2 != null)
-            {
-                crt2.anchoredPosition = Vector2.zero;
-            }
-        }
-        if (resultText != null)
-        {
-            var rrt2 = resultText.GetComponent<RectTransform>();
-            if (rrt2 != null)
-            {
-                rrt2.anchoredPosition = new Vector2(0, -30 * uiScale);
-            }
-        }
-        if (potText != null)
-        {
-            var prt2 = potText.GetComponent<RectTransform>();
-            if (prt2 != null)
-            {
-                prt2.anchoredPosition = new Vector2(0, -60 * uiScale);
-            }
-        }
-        if (paramsContainerGO != null)
-        {
-            var prt3 = paramsContainerGO.GetComponent<RectTransform>();
-            if (prt3 != null)
-            {
-                prt3.anchoredPosition = new Vector2(0, -90 * uiScale);
-            }
-        }
+        // animate arrangement to account for new player element
+        CoroutineTracker.Start(this, ArrangePlayersSmooth(playerTextGOs, uiScale, 0.25f));
     }
+
+
+    // RebuildPlayerTextFields removed — use BindPlayer for per-player setup.
 
     void OnDestroy()
     {
@@ -537,9 +480,10 @@ public class UIManager : MonoBehaviour
     {
         // Rebuild player text fields if player count changed, then refresh
         int cnt = (players != null) ? players.Count : ((game != null && game.players != null) ? game.players.Count : 0);
-        if (cnt != playerTexts.Length)
+        // Ensure UI elements exist for each player and bind them
+        for (int i = 0; i < cnt; i++)
         {
-            RebuildPlayerTextFields(cnt, uiFont, uiScale);
+            BindPlayer(i, players[i]);
         }
         // subscribe to per-player data changes and update UI
         SubscribeAllPlayerData();
@@ -716,6 +660,15 @@ public class UIManager : MonoBehaviour
         var tester = new GameObject("Test");
         var flowTest = tester.AddComponent<PokerGameFlowTest>();
         CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
+
+
+
+        int initialCount = (game != null && game.players != null) ? game.players.Count : 0;
+        for (int i = 0; i < initialCount; i++)
+        {
+            BindPlayer(i, game.players[i]);
+        }
+        SubscribeAllPlayerData();
     }
 
     // Hide settings while the provided inner routine runs, then restore UI
