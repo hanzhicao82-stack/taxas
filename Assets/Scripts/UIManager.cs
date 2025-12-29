@@ -12,6 +12,8 @@ public class UIManager : MonoBehaviour
     // Runtime-resolved references (do not configure in inspector)
     private PokerGame game => UnityEngine.Object.FindObjectOfType<PokerGame>();
     private Text[] playerTexts;
+    private int[] playerBaseFontSizes;
+    private Color[] playerBaseColors;
     private List<GameObject> playerTextGOs;
     private Text communityText;
     private Text potText;
@@ -430,6 +432,15 @@ public class UIManager : MonoBehaviour
         }
         playerTexts = labelsList.ToArray();
 
+        // store base font sizes and colors for highlighting
+        playerBaseFontSizes = new int[playerTexts.Length];
+        playerBaseColors = new Color[playerTexts.Length];
+        for (int i = 0; i < playerTexts.Length; i++)
+        {
+            playerBaseFontSizes[i] = (playerTexts[i] != null) ? playerTexts[i].fontSize : Mathf.RoundToInt(14 * uiScale);
+            playerBaseColors[i] = (playerTexts[i] != null) ? playerTexts[i].color : Color.white;
+        }
+
         // Arrange and animate to circular positions
         CoroutineTracker.Start(this, ArrangePlayersSmooth(playerTextGOs, uiScale, 0.35f));
 
@@ -613,6 +624,31 @@ public class UIManager : MonoBehaviour
     public void UpdatePot(int pot)
     {
         UpdatePotText(pot);
+    }
+
+    // Highlight the current acting player's label by enlarging font size by 50%.
+    public void HighlightPlayer(int seat)
+    {
+        if (playerTexts == null || playerTexts.Length == 0) return;
+        int idx = seat - 1;
+        for (int i = 0; i < playerTexts.Length; i++)
+        {
+            var t = playerTexts[i];
+            if (t == null) continue;
+            int baseSize = (playerBaseFontSizes != null && i < playerBaseFontSizes.Length) ? playerBaseFontSizes[i] : t.fontSize;
+            if (i == idx)
+            {
+                t.fontSize = Mathf.RoundToInt(baseSize * 1.5f);
+                t.color = Color.green;
+            }
+            else
+            {
+                t.fontSize = baseSize;
+                // restore base color if available
+                if (playerBaseColors != null && i < playerBaseColors.Length)
+                    t.color = playerBaseColors[i];
+            }
+        }
     }
 
     public void OnDealClicked()

@@ -1,8 +1,19 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System.Linq;
 
+
+public enum ERoundPhase
+{
+    Preflop,
+    Flop,
+    Turn,
+    River,
+    Showdown
+}
 /// <summary>
 /// Poker game main flow (dealer, blinds, Preflop/Flop/Turn/River/Showdown).
 /// Coroutine-driven so UI can update between AI actions. Publishes events
@@ -16,6 +27,7 @@ public class PokerGame : MonoBehaviour
 
     private Deck deck;
     public UIManager ui;
+    public HumanPlayerUI humanUI;
     public AIConfig aiConfig;
 
     // Tracked coroutines so we can stop them when this object is destroyed
@@ -31,7 +43,12 @@ public class PokerGame : MonoBehaviour
     private enum Phase { Preflop, Flop, Turn, River, Showdown }
     private Phase phase;
 
-    void Start() { }
+    void Start()
+    {
+
+    }
+
+    // CreateHumanPlayerUI moved to HumanPlayerUI.CreateHumanPlayerUI()
 
     private Coroutine StartTrackedCoroutine(System.Collections.IEnumerator routine)
     {
@@ -74,6 +91,18 @@ public class PokerGame : MonoBehaviour
 
     public System.Collections.IEnumerator StartHandRoutine()
     {
+        if (humanUI == null)
+        {
+            humanUI = UnityEngine.Object.FindObjectOfType<HumanPlayerUI>();
+            if (humanUI == null)
+            {
+                humanUI = HumanPlayerUI.CreateHumanPlayerUI();
+            }
+        }
+
+        yield return null;
+        yield return null;
+
         if (players == null || players.Count != numPlayers)
         {
             players = new List<Player>();
@@ -101,7 +130,7 @@ public class PokerGame : MonoBehaviour
         // Preflop
         phase = Phase.Preflop;
         Debug.Log("--- Preflop: 开始下注轮 ---");
-        yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterBigBlind()));
+        yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Preflop));
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
@@ -113,7 +142,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- Flop: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Flop));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -126,7 +155,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- Turn: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Turn));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -139,7 +168,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- River: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(GetFirstToActAfterDealer()));
+            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.River));
         }
 
         // Showdown & payout
@@ -200,39 +229,41 @@ public class PokerGame : MonoBehaviour
     private int GetFirstToActAfterBigBlind() => (dealerIndex + 3) % numPlayers;
     private int GetFirstToActAfterDealer() => (dealerIndex + 1) % numPlayers;
 
-    private int ActivePlayersCount() => players.Count(p => !p.data.Folded);
     private int ActivePlayersCountExcludingAllIn() => players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
 
-    private System.Collections.IEnumerator RunBettingRound(int startIndex)
+    private System.Collections.IEnumerator RunBettingRound(ERoundPhase phase)
     {
         int n = players.Count;
-        int safety = 0;
-        bool changed = true;
-        while (changed && safety < 100)
+        for (int i = 0; i < n; i++)
         {
-            changed = false;
-            safety++;
-            for (int i = 0; i < n; i++)
-            {
-                int idx = (startIndex + i) % n;
-                var p = players[idx];
-                if (p.data.Folded || p.data.AllIn)
-                    continue;
-                int need = currentBet - p.data.CurrentBet;
-                if (PlayerAI.Act(p, this, need))
-                    changed = true;
 
-                float d = (aiConfig != null) ? aiConfig.actionDelay : 0.3f;
-                if (d > 0f)
-                    yield return new WaitForSeconds(d);
-                else
-                    yield return null;
+            Player p = players[i];
+            // Notify UI which player is acting
+            ui?.HighlightPlayer(i);
+            // If a HumanPlayerUI is available, use it for every seat (no AI)
+            if (humanUI != null)
+            {
+                // show the UI (indicate which seat by context; UI can display seat if needed)
+                humanUI.ShowForSeat(1);
+                // wait for player action
+                yield return p.Act(phase);
+                yield return null;
             }
-            yield return null;
+            else
+            {
+                // // fallback to AI if no human UI provided
+                // PlayerAI.Act(p, this, need);
+
+
+                // float d = (aiConfig != null) ? aiConfig.actionDelay : 0.3f;
+                // if (d > 0f)
+                //     yield return new WaitForSeconds(d);
+                // else
+                //     yield return null;
+            }
         }
-        data.Pot = players.Sum(p => p.data.CurrentBet);
-        Debug.Log($"下注轮结束。已投入彩池={data.Pot}");
-        yield break;
+        yield return null;
+
     }
 
     private List<(int amount, List<int> eligible)> CollectPots()
