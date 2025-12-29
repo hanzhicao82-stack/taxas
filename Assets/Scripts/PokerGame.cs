@@ -50,19 +50,7 @@ public class PokerGame : MonoBehaviour
 
     // CreateHumanPlayerUI moved to HumanPlayerUI.CreateHumanPlayerUI()
 
-    private Coroutine StartTrackedCoroutine(System.Collections.IEnumerator routine)
-    {
-        Coroutine handle = null;
-        System.Collections.IEnumerator Wrapper()
-        {
-            yield return routine;
-            // remove when finished
-            trackedCoroutines.Remove(handle);
-        }
-        handle = StartCoroutine(Wrapper());
-        trackedCoroutines.Add(handle);
-        return handle;
-    }
+   
 
     public void StopTrackedCoroutine(Coroutine c)
     {
@@ -130,7 +118,7 @@ public class PokerGame : MonoBehaviour
         // Preflop
         phase = Phase.Preflop;
         Debug.Log("--- Preflop: 开始下注轮 ---");
-        yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Preflop));
+        yield return StartCoroutine(RunBettingRound(ERoundPhase.Preflop));
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
@@ -142,7 +130,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- Flop: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Flop));
+            yield return StartCoroutine(RunBettingRound(ERoundPhase.Flop));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -155,7 +143,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- Turn: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.Turn));
+            yield return StartCoroutine(RunBettingRound(ERoundPhase.Turn));
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -168,7 +156,7 @@ public class PokerGame : MonoBehaviour
             data.CurrentBet = 0;
             Debug.Log("--- River: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
-            yield return StartTrackedCoroutine(RunBettingRound(ERoundPhase.River));
+            yield return StartCoroutine(RunBettingRound(ERoundPhase.River));
         }
 
         // Showdown & payout
@@ -244,7 +232,7 @@ public class PokerGame : MonoBehaviour
             if (humanUI != null)
             {
                 // show the UI (indicate which seat by context; UI can display seat if needed)
-                humanUI.ShowForSeat(1);
+                humanUI.ShowForSeat(i, phase);
                 // wait for player action
                 yield return p.Act(phase);
                 yield return null;

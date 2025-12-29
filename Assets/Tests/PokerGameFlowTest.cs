@@ -39,19 +39,9 @@ public class PokerGameFlowTest : MonoBehaviour
         Debug.Log($"Initial total chips = {initialTotal}");
 
         // 运行若干手牌并在每手后检查基本不变量（每手之间让出一帧，避免阻塞主线程）
-        for (int h = 0; h < handsToPlay; h++)
-        {
-            // 使用带超时保护的执行，防止任意一手因 AI/逻辑问题卡住整个测试
-            float timeoutSec = 60f; // 超时阈值，可根据需要调整
-            bool completed = false;
-            yield return CoroutineTracker.Start(this, RunWithTimeout(game.StartHandRoutine(), timeoutSec, (ok) => completed = ok));
-
-            if (!completed)
-            {
-                Debug.LogError($"[ERROR] Hand {h + 1} did not complete within {timeoutSec} seconds (timed out)");
-                break;
-            }
-
+        for (int h = 0; h < handsToPlay; h++)        {
+  
+            yield return StartCoroutine(game.StartHandRoutine());     
             int total = game.players.Sum(p => p.data.Stack);
             if (total != initialTotal)
             {
@@ -61,7 +51,6 @@ public class PokerGameFlowTest : MonoBehaviour
             {
                 Debug.LogWarning($"[OK] After hand {h + 1}: total chips = {total}");
             }
-
             // 异步点：等待一帧再继续下一手（在 Play 模式下非阻塞）
             yield return null;
         }

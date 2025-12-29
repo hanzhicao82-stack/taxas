@@ -10,6 +10,7 @@ using UnityEngine.EventSystems;
 public class UIManager : MonoBehaviour
 {
     // Runtime-resolved references (do not configure in inspector)
+    // Cached reference to avoid repeated FindObjectOfType calls
     private PokerGame game => UnityEngine.Object.FindObjectOfType<PokerGame>();
     private Text[] playerTexts;
     private int[] playerBaseFontSizes;
@@ -58,6 +59,8 @@ public class UIManager : MonoBehaviour
         }
 
         var root = canvas.transform;
+
+       
         // Ensure an EventSystem exists so UI (Slider, Buttons) can receive input
         if (UnityEngine.Object.FindObjectOfType<EventSystem>() == null)
         {
@@ -236,7 +239,18 @@ public class UIManager : MonoBehaviour
         onFlopWrapper = (obj) => { try { var t = (Tuple<List<Card>, List<Card>>)obj; OnCommunityUpdated(t); } catch { } };
         onTurnWrapper = (obj) => { try { var t = (Tuple<List<Card>, List<Card>>)obj; OnCommunityUpdated(t); } catch { } };
         onRiverWrapper = (obj) => { try { var t = (Tuple<List<Card>, List<Card>>)obj; OnCommunityUpdated(t); } catch { } };
-        onHandStartedWrapper = (obj) => { try { var t = (List<Player>)obj; OnHandStarted(t); } catch { } };
+        onHandStartedWrapper = (obj) =>
+        {
+            try
+            {
+                var t = (List<Player>)obj;
+                OnHandStarted(t);
+            }
+            catch
+            {
+
+            }
+        };
         GameEventBus.Subscribe(Events.Flop, onFlopWrapper);
         GameEventBus.Subscribe(Events.Turn, onTurnWrapper);
         GameEventBus.Subscribe(Events.River, onRiverWrapper);
@@ -486,7 +500,6 @@ public class UIManager : MonoBehaviour
             BindPlayer(i, players[i]);
         }
         // subscribe to per-player data changes and update UI
-        SubscribeAllPlayerData();
     }
 
     // These object-typed wrappers are stored as delegates to allow reliable Unsubscribe
@@ -603,10 +616,6 @@ public class UIManager : MonoBehaviour
 
     private void OnStartClicked()
     {
-
-        // Subscribe to player data and update UI
-        SubscribeAllPlayerData();
-
         // Build or reuse an AIConfig to pass to the test/run
         AIConfig cfg = null;
         if (game != null && game.aiConfig != null)

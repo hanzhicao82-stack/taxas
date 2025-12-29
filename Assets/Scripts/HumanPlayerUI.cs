@@ -264,12 +264,26 @@ public class HumanPlayerUI : MonoBehaviour
     // Call this from your game-turn logic when it's a player's turn.
     // Call this from your game-turn logic when it's a player's turn.
     // Show the panel and update the seat label so player knows who is acting.
-    public void ShowForSeat(int seat)
+    public void ShowForSeat(int seat, ERoundPhase phase)
     {
         currentSeat = seat;
         if (seatLabel != null)
         {
-            seatLabel.text = $"座位 {seat} 行动";
+            switch (phase)
+            {
+                case ERoundPhase.Preflop:
+                    seatLabel.text = $"座位 {currentSeat + 1} 下注）";
+                    break;
+                case ERoundPhase.Flop:
+                    seatLabel.text = $"座位 {currentSeat + 1} 行动（翻牌）";
+                    break;
+                case ERoundPhase.Turn:
+                    seatLabel.text = $"座位 {currentSeat + 1} 行动（转牌）";
+                    break;
+                case ERoundPhase.River:
+                    seatLabel.text = $"座位 {currentSeat + 1} 行动（河牌）";
+                    break;
+            }
         }
         Show();
     }

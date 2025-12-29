@@ -53,14 +53,28 @@ public class Player
 
     public IEnumerator Act(ERoundPhase phase)
     {
-        BindUI(phase);
-        acting = true;
-        while (acting)
+        if (CanAct())
+        {
+            BindUI(phase);
+            acting = true;
+            while (acting)
+            {
+                yield return null;
+            }
+            HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
+        }
+        else
         {
             yield return null;
-
         }
-        HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
+
+    }
+
+   
+
+    bool CanAct()
+    {
+        return !data.Folded && !data.AllIn && data.Stack > 0;
     }
 
 
