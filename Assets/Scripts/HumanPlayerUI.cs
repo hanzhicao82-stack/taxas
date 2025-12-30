@@ -179,7 +179,7 @@ public class HumanPlayerUI : MonoBehaviour
 
         // Raise slider (top)
         var sliderGO = new GameObject("RaiseSlider"); sliderGO.transform.SetParent(raisePanel.transform, false);
-        var srt = sliderGO.AddComponent<RectTransform>(); srt.sizeDelta = new Vector2(260, 28);
+        var srt = sliderGO.AddComponent<RectTransform>(); srt.sizeDelta = new Vector2(260, 40);
         var slider = sliderGO.AddComponent<Slider>();
         slider.minValue = 0f; slider.maxValue = 1f; slider.wholeNumbers = false; slider.value = 0.5f;
         var sBg = new GameObject("Background"); sBg.transform.SetParent(sliderGO.transform, false);
@@ -188,8 +188,9 @@ public class HumanPlayerUI : MonoBehaviour
         var hImg = handle.AddComponent<Image>(); hImg.color = Color.white;
         slider.fillRect = sBgImg.rectTransform; slider.handleRect = hImg.rectTransform; slider.targetGraphic = hImg;
         var valGO = new GameObject("RaiseValue"); valGO.transform.SetParent(raisePanel.transform, false);
-        var valRt = valGO.AddComponent<RectTransform>(); valRt.sizeDelta = new Vector2(260, 20);
+        var valRt = valGO.AddComponent<RectTransform>(); valRt.sizeDelta = new Vector2(260, 24);
         var valText = valGO.AddComponent<Text>(); valText.font = font; valText.fontSize = 14; valText.alignment = TextAnchor.MiddleCenter; valText.color = Color.white; valText.text = "50%";
+        // initial percent-only listener (will be overridden when panel opens to include chip amount)
         slider.onValueChanged.AddListener((v) => { valText.text = Mathf.RoundToInt(v * 100f) + "%"; });
 
         // Confirm / Cancel container (buttons below)
@@ -227,7 +228,7 @@ public class HumanPlayerUI : MonoBehaviour
         var bCsf = betPanel.AddComponent<ContentSizeFitter>(); bCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         betPanel.SetActive(false);
         var bSliderGO = new GameObject("BetSlider"); bSliderGO.transform.SetParent(betPanel.transform, false);
-        var bsRt = bSliderGO.AddComponent<RectTransform>(); bsRt.sizeDelta = new Vector2(260, 28);
+        var bsRt = bSliderGO.AddComponent<RectTransform>(); bsRt.sizeDelta = new Vector2(260, 40);
         var bSlider = bSliderGO.AddComponent<Slider>(); bSlider.minValue = 0f; bSlider.maxValue = 1f; bSlider.wholeNumbers = false; bSlider.value = 0.5f;
         var bBg = new GameObject("Background"); bBg.transform.SetParent(bSliderGO.transform, false);
         var bBgImg = bBg.AddComponent<Image>(); bBgImg.color = new Color(0.15f, 0.15f, 0.15f);
@@ -235,7 +236,7 @@ public class HumanPlayerUI : MonoBehaviour
         var bHImg = bHandle.AddComponent<Image>(); bHImg.color = Color.white;
         bSlider.fillRect = bBgImg.rectTransform; bSlider.handleRect = bHImg.rectTransform; bSlider.targetGraphic = bHImg;
         var bValGO = new GameObject("BetValue"); bValGO.transform.SetParent(betPanel.transform, false);
-        var bValRt = bValGO.AddComponent<RectTransform>(); bValRt.sizeDelta = new Vector2(260, 20);
+        var bValRt = bValGO.AddComponent<RectTransform>(); bValRt.sizeDelta = new Vector2(260, 24);
         var bValText = bValGO.AddComponent<Text>(); bValText.font = font; bValText.fontSize = 14; bValText.alignment = TextAnchor.MiddleCenter; bValText.color = Color.white; bValText.text = "50%";
         bSlider.onValueChanged.AddListener((v) => { bValText.text = Mathf.RoundToInt(v * 100f) + "%"; });
         var betBtnRow = new GameObject("BetButtons"); betBtnRow.transform.SetParent(betPanel.transform, false);
@@ -325,15 +326,29 @@ public class HumanPlayerUI : MonoBehaviour
 
     void AllIn()
     {
-        OnAction?.Invoke(EPlayerAction.AllIn);
-        Hide();
-    }
-
-    void Fold()
-    {
-        OnAction?.Invoke(EPlayerAction.Fold);
-        Hide();
-    }
+            if (betSlider != null)
+            {
+                var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                int stack = 0; int minAllowed = 1;
+                if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                {
+                    stack = game.players[currentSeat].data.Stack;
+                    minAllowed = game.data.BigBlindAmount;
+                }
+                float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
+                betSlider.minValue = minFrac;
+                betSlider.maxValue = 1f;
+                betSlider.value = Mathf.Clamp(betSlider.value, minFrac, 1f);
+                betSlider.onValueChanged.RemoveAllListeners();
+                betSlider.onValueChanged.AddListener((v) => {
+                    var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                    int s = 0;
+                    if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
+                    int chips = Mathf.RoundToInt(v * s);
+                    if (betValueLabel != null) betValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
+                });
+                betSlider.onValueChanged.Invoke(betSlider.value);
+            }
 
     void Call()
     {
@@ -356,8 +371,27 @@ public class HumanPlayerUI : MonoBehaviour
             raisePanel.SetActive(true);
             if (raiseSlider != null)
             {
-                raiseSlider.value = 0.5f;
-                if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(raiseSlider.value * 100f) + "%";
+                var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                int stack = 0; int minAllowed = 1;
+                if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                {
+                    stack = game.players[currentSeat].data.Stack;
+                    minAllowed = game.data.BigBlindAmount;
+                }
+                float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
+                raiseSlider.minValue = minFrac;
+                raiseSlider.maxValue = 1f;
+                raiseSlider.value = Mathf.Clamp(raiseSlider.value, minFrac, 1f);
+                raiseSlider.onValueChanged.RemoveAllListeners();
+                raiseSlider.onValueChanged.AddListener((v) => {
+                    var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                    int s = 0;
+                    if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
+                    int chips = Mathf.RoundToInt(v * s);
+                    if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
+                });
+                // initialize label
+                raiseSlider.onValueChanged.Invoke(raiseSlider.value);
             }
         }
         else
@@ -394,6 +428,9 @@ public class HumanPlayerUI : MonoBehaviour
         {
             int stack = game.players[currentSeat].data.Stack;
             amount = Mathf.RoundToInt(raiseSlider.value * stack);
+            // enforce minimum raise (at least big blind) and clamp to stack
+            int minAllowed = Mathf.Max(1, game.data.BigBlindAmount);
+            amount = Mathf.Clamp(amount, minAllowed, stack);
         }
         OnAction?.Invoke(EPlayerAction.Raise, amount);
         if (raisePanel != null) raisePanel.SetActive(false);
@@ -408,6 +445,8 @@ public class HumanPlayerUI : MonoBehaviour
         {
             int stack = game.players[currentSeat].data.Stack;
             amount = Mathf.RoundToInt(betSlider.value * stack);
+            int minAllowed = Mathf.Max(1, game.data.BigBlindAmount);
+            amount = Mathf.Clamp(amount, minAllowed, stack);
         }
         OnAction?.Invoke(EPlayerAction.Bet, amount == 0 ? 0 : amount);
         if (betPanel != null) betPanel.SetActive(false);
