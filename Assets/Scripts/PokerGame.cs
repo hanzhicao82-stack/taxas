@@ -89,6 +89,12 @@ public class PokerGame : MonoBehaviour
             }
         }
 
+        // ensure UIManager reference is available so we can call ShowWinners etc.
+        if (ui == null)
+        {
+            ui = UnityEngine.Object.FindObjectOfType<UIManager>();
+        }
+
         yield return null;
         yield return null;
 
