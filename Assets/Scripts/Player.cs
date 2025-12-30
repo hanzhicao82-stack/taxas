@@ -150,16 +150,19 @@ public class Player
             case EPlayerAction.Raise:
                 {
                     int amount = 0;
-                    if (args != null && args.Length > 0 && args[0] is int) amount = (int)args[0];
+                    if (args != null && args.Length > 0 && args[0] is int)
+                        amount = (int)args[0];
                     int minRaise = Mathf.Max(1, game.data.BigBlindAmount);
                     int desiredExtra = Mathf.Max(amount, minRaise);
                     int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
                     data.Stack -= totalPay;
                     data.CurrentBet += totalPay;
-                    if (game != null) game.data.Pot += totalPay;
+                    if (game != null)
+                        game.data.Pot += totalPay;
                     if (data.Stack <= 0)
                         data.AllIn = true;
-                    if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+                    if (data.CurrentBet > game.currentBet)
+                        game.currentBet = data.CurrentBet;
                 }
                 break;
             case EPlayerAction.AllIn:

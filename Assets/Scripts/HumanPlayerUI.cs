@@ -172,7 +172,12 @@ public class HumanPlayerUI : MonoBehaviour
         var rrt = raisePanel.AddComponent<RectTransform>(); rrt.sizeDelta = new Vector2(300, 96);
         rrt.anchorMin = new Vector2(0.5f, 0); rrt.anchorMax = new Vector2(0.5f, 0); rrt.pivot = new Vector2(0.5f, 0); rrt.anchoredPosition = new Vector2(0, 140);
         var rimg = raisePanel.AddComponent<Image>(); rimg.color = new Color(0f, 0f, 0f, 0.75f);
-        var rVlg = raisePanel.AddComponent<VerticalLayoutGroup>(); rVlg.spacing = 6; rVlg.childAlignment = TextAnchor.UpperCenter; rVlg.childForceExpandWidth = true; rVlg.childControlHeight = true; rVlg.childControlWidth = true;
+        var rVlg = raisePanel.AddComponent<VerticalLayoutGroup>(); 
+        rVlg.spacing = 20;
+        rVlg.childAlignment = TextAnchor.UpperCenter;
+        rVlg.childForceExpandWidth = true;
+        rVlg.childControlHeight = false;
+        rVlg.childControlWidth = true;
         var rCsf = raisePanel.AddComponent<ContentSizeFitter>(); rCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         raisePanel.SetActive(false);
 
@@ -180,10 +185,10 @@ public class HumanPlayerUI : MonoBehaviour
 
         var sliderGO = GameObject.Instantiate(Resources.Load<GameObject>("Slider"));
         sliderGO.transform.SetParent(raisePanel.transform, false);
-        Slider slider = sliderGO.GetComponent<Slider>();
+        Slider raiseSlider = sliderGO.GetComponent<Slider>();
         Text valText = sliderGO.GetComponentInChildren<Text>();
         // initial percent-only listener (will be overridden when panel opens to include chip amount)
-        slider.onValueChanged.AddListener((v) => { valText.text = Mathf.RoundToInt(v * 100f) + "%"; });
+        raiseSlider.onValueChanged.AddListener((v) => { valText.text = Mathf.RoundToInt(v * 100f) + "%"; });
 
         // Confirm / Cancel container (buttons below)
         Button CreateSmall(string label, Vector2 pos, Transform parent)
@@ -216,10 +221,10 @@ public class HumanPlayerUI : MonoBehaviour
         var bprt = betPanel.AddComponent<RectTransform>(); bprt.sizeDelta = new Vector2(300, 96);
         bprt.anchorMin = new Vector2(0.5f, 0); bprt.anchorMax = new Vector2(0.5f, 0); bprt.pivot = new Vector2(0.5f, 0); bprt.anchoredPosition = new Vector2(0, 230);
         var bimg = betPanel.AddComponent<Image>(); bimg.color = new Color(0f, 0f, 0f, 0.75f);
-        var bVlg = betPanel.AddComponent<VerticalLayoutGroup>(); 
-        bVlg.spacing = 20; bVlg.childAlignment = TextAnchor.UpperCenter; 
-        bVlg.childForceExpandWidth = true; 
-        bVlg.childControlHeight = false; 
+        var bVlg = betPanel.AddComponent<VerticalLayoutGroup>();
+        bVlg.spacing = 20; bVlg.childAlignment = TextAnchor.UpperCenter;
+        bVlg.childForceExpandWidth = true;
+        bVlg.childControlHeight = false;
         bVlg.childControlWidth = true;
         var bCsf = betPanel.AddComponent<ContentSizeFitter>(); bCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         betPanel.SetActive(false);
@@ -230,7 +235,7 @@ public class HumanPlayerUI : MonoBehaviour
         var bSliderGO = GameObject.Instantiate(Resources.Load<GameObject>("Slider"));
         bSliderGO.transform.SetParent(betPanel.transform, false);
         var bSlider = bSliderGO.GetComponent<Slider>();
-        var bValText = bSliderGO.GetComponentInChildren<Text>(); 
+        var bValText = bSliderGO.GetComponentInChildren<Text>();
         bValText.text = "50%";
         bSlider.onValueChanged.AddListener((v) =>
         {
@@ -240,10 +245,10 @@ public class HumanPlayerUI : MonoBehaviour
             bValText.text = Mathf.RoundToInt(v * 100f) + "%" + " (" + stack + " 筹码)";
         });
 
-        
+
         var betBtnRow = new GameObject("BetButtons"); betBtnRow.transform.SetParent(betPanel.transform, false);
         var bbrt = betBtnRow.AddComponent<RectTransform>();
-    
+
         var bHlg = betBtnRow.AddComponent<HorizontalLayoutGroup>(); bHlg.spacing = 8; bHlg.childAlignment = TextAnchor.MiddleCenter; bHlg.childForceExpandWidth = false;
         var betConf = CreateSmall("确定", Vector2.zero, betBtnRow.transform);
         var betCanc = CreateSmall("取消", Vector2.zero, betBtnRow.transform);
@@ -261,7 +266,7 @@ public class HumanPlayerUI : MonoBehaviour
 
         h.raiseButton = raiseB;
         h.raisePanel = raisePanel;
-        h.raiseSlider = slider;
+        h.raiseSlider = raiseSlider;
         h.raiseValueLabel = valText;
         h.raiseConfirmButton = confBtn;
         h.raiseCancelButton = cancBtn;
