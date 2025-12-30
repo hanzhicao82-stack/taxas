@@ -168,42 +168,39 @@ public class HumanPlayerUI : MonoBehaviour
         seatText.fontSize = 20; seatText.fontStyle = FontStyle.Bold;
         var seatShadow = seatLabelGO.AddComponent<Shadow>(); seatShadow.effectColor = new Color(0f, 0f, 0f, 0.6f); seatShadow.effectDistance = new Vector2(2, -2);
 
-        // Raise panel
+        // Raise panel (vertical layout: slider on top, buttons below)
         var raisePanel = new GameObject("RaisePanel"); raisePanel.transform.SetParent(root.transform, false);
-        var rrt = raisePanel.AddComponent<RectTransform>(); rrt.sizeDelta = new Vector2(260, 80);
+        var rrt = raisePanel.AddComponent<RectTransform>(); rrt.sizeDelta = new Vector2(300, 96);
         rrt.anchorMin = new Vector2(0.5f, 0); rrt.anchorMax = new Vector2(0.5f, 0); rrt.pivot = new Vector2(0.5f, 0); rrt.anchoredPosition = new Vector2(0, 140);
         var rimg = raisePanel.AddComponent<Image>(); rimg.color = new Color(0f, 0f, 0f, 0.75f);
+        var rVlg = raisePanel.AddComponent<VerticalLayoutGroup>(); rVlg.spacing = 6; rVlg.childAlignment = TextAnchor.UpperCenter; rVlg.childForceExpandWidth = true; rVlg.childControlHeight = true; rVlg.childControlWidth = true;
+        var rCsf = raisePanel.AddComponent<ContentSizeFitter>(); rCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         raisePanel.SetActive(false);
 
-        // InputField
-        // Raise slider (0..1 fraction of stack)
+        // Raise slider (top)
         var sliderGO = new GameObject("RaiseSlider"); sliderGO.transform.SetParent(raisePanel.transform, false);
-        var srt = sliderGO.AddComponent<RectTransform>(); srt.sizeDelta = new Vector2(180, 24); srt.anchoredPosition = new Vector2(-10, 10);
+        var srt = sliderGO.AddComponent<RectTransform>(); srt.sizeDelta = new Vector2(260, 28);
         var slider = sliderGO.AddComponent<Slider>();
         slider.minValue = 0f; slider.maxValue = 1f; slider.wholeNumbers = false; slider.value = 0.5f;
-        // background
         var sBg = new GameObject("Background"); sBg.transform.SetParent(sliderGO.transform, false);
         var sBgImg = sBg.AddComponent<Image>(); sBgImg.color = new Color(0.15f, 0.15f, 0.15f);
-        var sBgRt = sBg.GetComponent<RectTransform>(); sBgRt.anchorMin = Vector2.zero; sBgRt.anchorMax = Vector2.one; sBgRt.offsetMin = Vector2.zero; sBgRt.offsetMax = Vector2.zero;
-        // handle
         var handle = new GameObject("Handle"); handle.transform.SetParent(sliderGO.transform, false);
         var hImg = handle.AddComponent<Image>(); hImg.color = Color.white;
-        var hRt = handle.GetComponent<RectTransform>(); hRt.sizeDelta = new Vector2(12, 24); hRt.anchorMin = new Vector2(0.5f, 0.5f); hRt.anchorMax = new Vector2(0.5f, 0.5f);
         slider.fillRect = sBgImg.rectTransform; slider.handleRect = hImg.rectTransform; slider.targetGraphic = hImg;
-        // value label
         var valGO = new GameObject("RaiseValue"); valGO.transform.SetParent(raisePanel.transform, false);
-        var valRt = valGO.AddComponent<RectTransform>(); valRt.sizeDelta = new Vector2(80, 24); valRt.anchoredPosition = new Vector2(90, 10);
-        var valText = valGO.AddComponent<Text>(); valText.font = font; valText.fontSize = 14; valText.alignment = TextAnchor.MiddleLeft; valText.color = Color.white; valText.text = "50%";
+        var valRt = valGO.AddComponent<RectTransform>(); valRt.sizeDelta = new Vector2(260, 20);
+        var valText = valGO.AddComponent<Text>(); valText.font = font; valText.fontSize = 14; valText.alignment = TextAnchor.MiddleCenter; valText.color = Color.white; valText.text = "50%";
         slider.onValueChanged.AddListener((v) => { valText.text = Mathf.RoundToInt(v * 100f) + "%"; });
 
-        // Confirm / Cancel (create smaller buttons inside raisePanel)
+        // Confirm / Cancel container (buttons below)
         Button CreateSmall(string label, Vector2 pos, Transform parent)
         {
             var go = new GameObject(label);
             go.transform.SetParent(parent, false);
-            var rtBtn = go.AddComponent<RectTransform>(); rtBtn.sizeDelta = new Vector2(96, 36); rtBtn.anchoredPosition = pos;
+            var rtBtn = go.AddComponent<RectTransform>(); rtBtn.sizeDelta = new Vector2(120, 36);
             var imgBtn = go.AddComponent<Image>(); imgBtn.color = new Color(0.2f, 0.2f, 0.2f);
             var btn = go.AddComponent<Button>();
+            var le = go.AddComponent<LayoutElement>(); le.preferredWidth = 120; le.preferredHeight = 36;
             var lbl = new GameObject("Label"); lbl.transform.SetParent(go.transform, false);
             var lblRt = lbl.AddComponent<RectTransform>(); lblRt.anchorMin = Vector2.zero; lblRt.anchorMax = Vector2.one; lblRt.offsetMin = Vector2.zero; lblRt.offsetMax = Vector2.zero;
             var txt = lbl.AddComponent<Text>(); txt.font = font; txt.fontSize = 14; txt.alignment = TextAnchor.MiddleCenter; txt.color = Color.white; txt.text = label;
@@ -211,9 +208,11 @@ public class HumanPlayerUI : MonoBehaviour
             return btn;
         }
 
-        var confBtn = CreateSmall("确定", new Vector2(20, 10), raisePanel.transform);
-        var cancBtn = CreateSmall("取消", new Vector2(140, 10), raisePanel.transform);
-        // adjust button labels and colors for clarity
+        var btnRow = new GameObject("RaiseButtons"); btnRow.transform.SetParent(raisePanel.transform, false);
+        var brt = btnRow.AddComponent<RectTransform>(); brt.sizeDelta = new Vector2(260, 40);
+        var hrow = btnRow.AddComponent<HorizontalLayoutGroup>(); hrow.spacing = 8; hrow.childAlignment = TextAnchor.MiddleCenter; hrow.childForceExpandWidth = false;
+        var confBtn = CreateSmall("确定", Vector2.zero, btnRow.transform);
+        var cancBtn = CreateSmall("取消", Vector2.zero, btnRow.transform);
         confBtn.GetComponentInChildren<Text>().text = "确定";
         cancBtn.GetComponentInChildren<Text>().text = "取消";
         confBtn.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
@@ -221,27 +220,29 @@ public class HumanPlayerUI : MonoBehaviour
 
         // Bet panel (similar to raise)
         var betPanel = new GameObject("BetPanel"); betPanel.transform.SetParent(root.transform, false);
-        var bprt = betPanel.AddComponent<RectTransform>(); bprt.sizeDelta = new Vector2(260, 80);
+        var bprt = betPanel.AddComponent<RectTransform>(); bprt.sizeDelta = new Vector2(300, 96);
         bprt.anchorMin = new Vector2(0.5f, 0); bprt.anchorMax = new Vector2(0.5f, 0); bprt.pivot = new Vector2(0.5f, 0); bprt.anchoredPosition = new Vector2(0, 230);
         var bimg = betPanel.AddComponent<Image>(); bimg.color = new Color(0f, 0f, 0f, 0.75f);
+        var bVlg = betPanel.AddComponent<VerticalLayoutGroup>(); bVlg.spacing = 6; bVlg.childAlignment = TextAnchor.UpperCenter; bVlg.childForceExpandWidth = true; bVlg.childControlHeight = true; bVlg.childControlWidth = true;
+        var bCsf = betPanel.AddComponent<ContentSizeFitter>(); bCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         betPanel.SetActive(false);
-        // Bet slider
         var bSliderGO = new GameObject("BetSlider"); bSliderGO.transform.SetParent(betPanel.transform, false);
-        var bsRt = bSliderGO.AddComponent<RectTransform>(); bsRt.sizeDelta = new Vector2(180, 24); bsRt.anchoredPosition = new Vector2(-10, 10);
+        var bsRt = bSliderGO.AddComponent<RectTransform>(); bsRt.sizeDelta = new Vector2(260, 28);
         var bSlider = bSliderGO.AddComponent<Slider>(); bSlider.minValue = 0f; bSlider.maxValue = 1f; bSlider.wholeNumbers = false; bSlider.value = 0.5f;
         var bBg = new GameObject("Background"); bBg.transform.SetParent(bSliderGO.transform, false);
         var bBgImg = bBg.AddComponent<Image>(); bBgImg.color = new Color(0.15f, 0.15f, 0.15f);
-        var bBgRt = bBg.GetComponent<RectTransform>(); bBgRt.anchorMin = Vector2.zero; bBgRt.anchorMax = Vector2.one; bBgRt.offsetMin = Vector2.zero; bBgRt.offsetMax = Vector2.zero;
         var bHandle = new GameObject("Handle"); bHandle.transform.SetParent(bSliderGO.transform, false);
         var bHImg = bHandle.AddComponent<Image>(); bHImg.color = Color.white;
-        var bHRt = bHandle.GetComponent<RectTransform>(); bHRt.sizeDelta = new Vector2(12, 24); bHRt.anchorMin = new Vector2(0.5f, 0.5f); bHRt.anchorMax = new Vector2(0.5f, 0.5f);
         bSlider.fillRect = bBgImg.rectTransform; bSlider.handleRect = bHImg.rectTransform; bSlider.targetGraphic = bHImg;
         var bValGO = new GameObject("BetValue"); bValGO.transform.SetParent(betPanel.transform, false);
-        var bValRt = bValGO.AddComponent<RectTransform>(); bValRt.sizeDelta = new Vector2(80, 24); bValRt.anchoredPosition = new Vector2(90, 10);
-        var bValText = bValGO.AddComponent<Text>(); bValText.font = font; bValText.fontSize = 14; bValText.alignment = TextAnchor.MiddleLeft; bValText.color = Color.white; bValText.text = "50%";
+        var bValRt = bValGO.AddComponent<RectTransform>(); bValRt.sizeDelta = new Vector2(260, 20);
+        var bValText = bValGO.AddComponent<Text>(); bValText.font = font; bValText.fontSize = 14; bValText.alignment = TextAnchor.MiddleCenter; bValText.color = Color.white; bValText.text = "50%";
         bSlider.onValueChanged.AddListener((v) => { bValText.text = Mathf.RoundToInt(v * 100f) + "%"; });
-        var betConf = CreateSmall("确定", new Vector2(20, 10), betPanel.transform);
-        var betCanc = CreateSmall("取消", new Vector2(140, 10), betPanel.transform);
+        var betBtnRow = new GameObject("BetButtons"); betBtnRow.transform.SetParent(betPanel.transform, false);
+        var bbrt = betBtnRow.AddComponent<RectTransform>(); bbrt.sizeDelta = new Vector2(260, 40);
+        var bHlg = betBtnRow.AddComponent<HorizontalLayoutGroup>(); bHlg.spacing = 8; bHlg.childAlignment = TextAnchor.MiddleCenter; bHlg.childForceExpandWidth = false;
+        var betConf = CreateSmall("确定", Vector2.zero, betBtnRow.transform);
+        var betCanc = CreateSmall("取消", Vector2.zero, betBtnRow.transform);
         betConf.GetComponentInChildren<Text>().text = "确定";
         betCanc.GetComponentInChildren<Text>().text = "取消";
         betConf.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
