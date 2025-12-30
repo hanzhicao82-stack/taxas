@@ -19,14 +19,16 @@ public class HumanPlayerUI : MonoBehaviour
 
     [Tooltip("Optional panel shown when entering a raise amount.")]
     public GameObject raisePanel;
-    public InputField raiseInputField;
+    public Slider raiseSlider;
+    public Text raiseValueLabel;
     public Button raiseConfirmButton;
     public Button raiseCancelButton;
 
     [Tooltip("Optional Bet panel and controls for initial bets when no current bet.")]
     public Button betButton;
     public GameObject betPanel;
-    public InputField betInputField;
+    public Slider betSlider;
+    public Text betValueLabel;
     public Button betConfirmButton;
     public Button betCancelButton;
 
@@ -174,20 +176,25 @@ public class HumanPlayerUI : MonoBehaviour
         raisePanel.SetActive(false);
 
         // InputField
-        var inputGO = new GameObject("RaiseInput"); inputGO.transform.SetParent(raisePanel.transform, false);
-        var irt = inputGO.AddComponent<RectTransform>(); irt.sizeDelta = new Vector2(160, 30); irt.anchoredPosition = new Vector2(-30, 10);
-        var inputBg = inputGO.AddComponent<Image>(); inputBg.color = Color.white * 0.9f;
-        var input = inputGO.AddComponent<InputField>();
-        var textGO = new GameObject("Text"); textGO.transform.SetParent(inputGO.transform, false);
-        var txtRt = textGO.AddComponent<RectTransform>(); txtRt.sizeDelta = irt.sizeDelta; txtRt.anchoredPosition = Vector2.zero;
-        var textComp = textGO.AddComponent<Text>(); textComp.font = font; textComp.fontSize = 14; textComp.color = Color.black; textComp.alignment = TextAnchor.MiddleLeft;
-        input.textComponent = textComp;
-        // placeholder
-        var placeholderGO = new GameObject("Placeholder"); placeholderGO.transform.SetParent(inputGO.transform, false);
-        var phRt = placeholderGO.AddComponent<RectTransform>(); phRt.sizeDelta = irt.sizeDelta; phRt.anchoredPosition = Vector2.zero;
-        var phText = placeholderGO.AddComponent<Text>(); phText.font = font; phText.fontSize = 14; phText.color = new Color(0.4f, 0.4f, 0.4f); phText.alignment = TextAnchor.MiddleLeft; phText.text = "输入加注金额";
-        input.placeholder = phText;
-        input.contentType = InputField.ContentType.IntegerNumber;
+        // Raise slider (0..1 fraction of stack)
+        var sliderGO = new GameObject("RaiseSlider"); sliderGO.transform.SetParent(raisePanel.transform, false);
+        var srt = sliderGO.AddComponent<RectTransform>(); srt.sizeDelta = new Vector2(180, 24); srt.anchoredPosition = new Vector2(-10, 10);
+        var slider = sliderGO.AddComponent<Slider>();
+        slider.minValue = 0f; slider.maxValue = 1f; slider.wholeNumbers = false; slider.value = 0.5f;
+        // background
+        var sBg = new GameObject("Background"); sBg.transform.SetParent(sliderGO.transform, false);
+        var sBgImg = sBg.AddComponent<Image>(); sBgImg.color = new Color(0.15f, 0.15f, 0.15f);
+        var sBgRt = sBg.GetComponent<RectTransform>(); sBgRt.anchorMin = Vector2.zero; sBgRt.anchorMax = Vector2.one; sBgRt.offsetMin = Vector2.zero; sBgRt.offsetMax = Vector2.zero;
+        // handle
+        var handle = new GameObject("Handle"); handle.transform.SetParent(sliderGO.transform, false);
+        var hImg = handle.AddComponent<Image>(); hImg.color = Color.white;
+        var hRt = handle.GetComponent<RectTransform>(); hRt.sizeDelta = new Vector2(12, 24); hRt.anchorMin = new Vector2(0.5f, 0.5f); hRt.anchorMax = new Vector2(0.5f, 0.5f);
+        slider.fillRect = sBgImg.rectTransform; slider.handleRect = hImg.rectTransform; slider.targetGraphic = hImg;
+        // value label
+        var valGO = new GameObject("RaiseValue"); valGO.transform.SetParent(raisePanel.transform, false);
+        var valRt = valGO.AddComponent<RectTransform>(); valRt.sizeDelta = new Vector2(80, 24); valRt.anchoredPosition = new Vector2(90, 10);
+        var valText = valGO.AddComponent<Text>(); valText.font = font; valText.fontSize = 14; valText.alignment = TextAnchor.MiddleLeft; valText.color = Color.white; valText.text = "50%";
+        slider.onValueChanged.AddListener((v) => { valText.text = Mathf.RoundToInt(v * 100f) + "%"; });
 
         // Confirm / Cancel (create smaller buttons inside raisePanel)
         Button CreateSmall(string label, Vector2 pos, Transform parent)
@@ -218,19 +225,21 @@ public class HumanPlayerUI : MonoBehaviour
         bprt.anchorMin = new Vector2(0.5f, 0); bprt.anchorMax = new Vector2(0.5f, 0); bprt.pivot = new Vector2(0.5f, 0); bprt.anchoredPosition = new Vector2(0, 230);
         var bimg = betPanel.AddComponent<Image>(); bimg.color = new Color(0f, 0f, 0f, 0.75f);
         betPanel.SetActive(false);
-        var betInputGO = new GameObject("BetInput"); betInputGO.transform.SetParent(betPanel.transform, false);
-        var birt = betInputGO.AddComponent<RectTransform>(); birt.sizeDelta = new Vector2(160, 30); birt.anchoredPosition = new Vector2(-30, 10);
-        var betInputBg = betInputGO.AddComponent<Image>(); betInputBg.color = Color.white * 0.9f;
-        var betInput = betInputGO.AddComponent<InputField>();
-        var betTextGO = new GameObject("Text"); betTextGO.transform.SetParent(betInputGO.transform, false);
-        var betTxtRt = betTextGO.AddComponent<RectTransform>(); betTxtRt.sizeDelta = birt.sizeDelta; betTxtRt.anchoredPosition = Vector2.zero;
-        var betTextComp = betTextGO.AddComponent<Text>(); betTextComp.font = font; betTextComp.fontSize = 14; betTextComp.color = Color.black; betTextComp.alignment = TextAnchor.MiddleLeft;
-        betInput.textComponent = betTextComp;
-        var betPlaceGO = new GameObject("Placeholder"); betPlaceGO.transform.SetParent(betInputGO.transform, false);
-        var bpRt = betPlaceGO.AddComponent<RectTransform>(); bpRt.sizeDelta = birt.sizeDelta; bpRt.anchoredPosition = Vector2.zero;
-        var bpText = betPlaceGO.AddComponent<Text>(); bpText.font = font; bpText.fontSize = 14; bpText.color = new Color(0.4f, 0.4f, 0.4f); bpText.alignment = TextAnchor.MiddleLeft; bpText.text = "输入下注金额";
-        betInput.placeholder = bpText;
-        betInput.contentType = InputField.ContentType.IntegerNumber;
+        // Bet slider
+        var bSliderGO = new GameObject("BetSlider"); bSliderGO.transform.SetParent(betPanel.transform, false);
+        var bsRt = bSliderGO.AddComponent<RectTransform>(); bsRt.sizeDelta = new Vector2(180, 24); bsRt.anchoredPosition = new Vector2(-10, 10);
+        var bSlider = bSliderGO.AddComponent<Slider>(); bSlider.minValue = 0f; bSlider.maxValue = 1f; bSlider.wholeNumbers = false; bSlider.value = 0.5f;
+        var bBg = new GameObject("Background"); bBg.transform.SetParent(bSliderGO.transform, false);
+        var bBgImg = bBg.AddComponent<Image>(); bBgImg.color = new Color(0.15f, 0.15f, 0.15f);
+        var bBgRt = bBg.GetComponent<RectTransform>(); bBgRt.anchorMin = Vector2.zero; bBgRt.anchorMax = Vector2.one; bBgRt.offsetMin = Vector2.zero; bBgRt.offsetMax = Vector2.zero;
+        var bHandle = new GameObject("Handle"); bHandle.transform.SetParent(bSliderGO.transform, false);
+        var bHImg = bHandle.AddComponent<Image>(); bHImg.color = Color.white;
+        var bHRt = bHandle.GetComponent<RectTransform>(); bHRt.sizeDelta = new Vector2(12, 24); bHRt.anchorMin = new Vector2(0.5f, 0.5f); bHRt.anchorMax = new Vector2(0.5f, 0.5f);
+        bSlider.fillRect = bBgImg.rectTransform; bSlider.handleRect = bHImg.rectTransform; bSlider.targetGraphic = bHImg;
+        var bValGO = new GameObject("BetValue"); bValGO.transform.SetParent(betPanel.transform, false);
+        var bValRt = bValGO.AddComponent<RectTransform>(); bValRt.sizeDelta = new Vector2(80, 24); bValRt.anchoredPosition = new Vector2(90, 10);
+        var bValText = bValGO.AddComponent<Text>(); bValText.font = font; bValText.fontSize = 14; bValText.alignment = TextAnchor.MiddleLeft; bValText.color = Color.white; bValText.text = "50%";
+        bSlider.onValueChanged.AddListener((v) => { bValText.text = Mathf.RoundToInt(v * 100f) + "%"; });
         var betConf = CreateSmall("确定", new Vector2(20, 10), betPanel.transform);
         var betCanc = CreateSmall("取消", new Vector2(140, 10), betPanel.transform);
         betConf.GetComponentInChildren<Text>().text = "确定";
@@ -247,11 +256,13 @@ public class HumanPlayerUI : MonoBehaviour
         h.betButton = betB;
         h.raiseButton = raiseB;
         h.raisePanel = raisePanel;
-        h.raiseInputField = input;
+        h.raiseSlider = slider;
+        h.raiseValueLabel = valText;
         h.raiseConfirmButton = confBtn;
         h.raiseCancelButton = cancBtn;
         h.betPanel = betPanel;
-        h.betInputField = betInput;
+        h.betSlider = bSlider;
+        h.betValueLabel = bValText;
         h.betConfirmButton = betConf;
         h.betCancelButton = betCanc;
         h.seatLabel = seatText;
@@ -342,7 +353,11 @@ public class HumanPlayerUI : MonoBehaviour
         {
             if (panel != null) panel.SetActive(false);
             raisePanel.SetActive(true);
-            if (raiseInputField != null) raiseInputField.text = "";
+            if (raiseSlider != null)
+            {
+                raiseSlider.value = 0.5f;
+                if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(raiseSlider.value * 100f) + "%";
+            }
         }
         else
         {
@@ -357,7 +372,11 @@ public class HumanPlayerUI : MonoBehaviour
         {
             if (panel != null) panel.SetActive(false);
             betPanel.SetActive(true);
-            if (betInputField != null) betInputField.text = "";
+            if (betSlider != null)
+            {
+                betSlider.value = 0.5f;
+                if (betValueLabel != null) betValueLabel.text = Mathf.RoundToInt(betSlider.value * 100f) + "%";
+            }
         }
         else
         {
@@ -369,11 +388,12 @@ public class HumanPlayerUI : MonoBehaviour
     void ConfirmRaise()
     {
         int amount = 0;
-        if (raiseInputField != null)
+        var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+        if (raiseSlider != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
         {
-            int.TryParse(raiseInputField.text, out amount);
+            int stack = game.players[currentSeat].data.Stack;
+            amount = Mathf.RoundToInt(raiseSlider.value * stack);
         }
-        // send action with entered amount (0 means treat as minimum raise in game logic)
         OnAction?.Invoke(EPlayerAction.Raise, amount);
         if (raisePanel != null) raisePanel.SetActive(false);
         if (panel != null) panel.SetActive(false);
@@ -382,9 +402,11 @@ public class HumanPlayerUI : MonoBehaviour
     void ConfirmBet()
     {
         int amount = 0;
-        if (betInputField != null)
+        var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+        if (betSlider != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
         {
-            int.TryParse(betInputField.text, out amount);
+            int stack = game.players[currentSeat].data.Stack;
+            amount = Mathf.RoundToInt(betSlider.value * stack);
         }
         OnAction?.Invoke(EPlayerAction.Bet, amount == 0 ? 0 : amount);
         if (betPanel != null) betPanel.SetActive(false);
@@ -411,8 +433,17 @@ public class HumanPlayerUI : MonoBehaviour
             if (panel != null)
                 panel.SetActive(false);
             betPanel.SetActive(true);
-            if (betInputField != null)
-                betInputField.text = "";
+            if (betSlider != null)
+            {
+                betSlider.value = 0.5f;
+                // update label immediately
+                var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                if (betValueLabel != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                {
+                    int stack = game.players[currentSeat].data.Stack;
+                    betValueLabel.text = Mathf.RoundToInt(betSlider.value * 100f) + "%";
+                }
+            }
         }
     }
 
