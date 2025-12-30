@@ -41,6 +41,7 @@ public class UIManager : MonoBehaviour
     private bool currentRunFinished;
     private Button restartButton;
     private GameObject restartButtonGO;
+    private Coroutine winnerCoroutine;
 
     void Start()
     {
@@ -590,7 +591,9 @@ public class UIManager : MonoBehaviour
         if (resultText == null) return;
         if (winners == null || winners.Count == 0)
         {
-            resultText.text = "胜者：无";
+            // show "no winners" briefly
+            if (winnerCoroutine != null) StopCoroutine(winnerCoroutine);
+            winnerCoroutine = StartCoroutine(ShowWinnersRoutine("胜者：无", 3f));
             return;
         }
         // Map indices to player names when possible
@@ -599,7 +602,18 @@ public class UIManager : MonoBehaviour
             if (game != null && game.players != null && i >= 0 && i < game.players.Count) return game.players[i].name;
             return $"P{i + 1}";
         }).ToArray();
-        resultText.text = "胜者：" + string.Join(", ", names);
+        string text = "胜者：" + string.Join(", ", names);
+        if (winnerCoroutine != null) StopCoroutine(winnerCoroutine);
+        winnerCoroutine = StartCoroutine(ShowWinnersRoutine(text, 3f));
+    }
+
+    private IEnumerator ShowWinnersRoutine(string text, float dur)
+    {
+        resultText.text = text;
+        yield return new WaitForSeconds(dur);
+        // clear result text after duration
+        resultText.text = "";
+        winnerCoroutine = null;
     }
 
     // Highlight the current acting player's label by enlarging font size by 50%.
