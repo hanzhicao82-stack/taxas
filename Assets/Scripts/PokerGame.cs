@@ -50,7 +50,7 @@ public class PokerGame : MonoBehaviour
 
     // CreateHumanPlayerUI moved to HumanPlayerUI.CreateHumanPlayerUI()
 
-   
+
 
     public void StopTrackedCoroutine(Coroutine c)
     {
@@ -79,6 +79,7 @@ public class PokerGame : MonoBehaviour
 
     public System.Collections.IEnumerator StartHandRoutine()
     {
+        Debug.Log($"StartHandRoutine: dealer={dealerIndex + 1}, numPlayers={numPlayers}");
         if (humanUI == null)
         {
             humanUI = UnityEngine.Object.FindObjectOfType<HumanPlayerUI>();
@@ -110,6 +111,12 @@ public class PokerGame : MonoBehaviour
         {
             players[i].data.AddHole(deck.Draw());
             players[i].data.AddHole(deck.Draw());
+            // debug: show hole cards dealt (useful during development)
+            var h = players[i].data.Hole;
+            if (h != null && h.Count >= 2)
+            {
+                Debug.Log($"Dealt to P{i + 1}: {h[0]} {h[1]}");
+            }
         }
 
         PostBlinds();
@@ -167,29 +174,39 @@ public class PokerGame : MonoBehaviour
         {
             int amount = potInfo.amount;
             var elig = potInfo.eligible;
+            Debug.Log($"Payout pot amount={amount}, eligible=[{string.Join(",", elig)}]");
             long best = -1;
             List<int> winners = new List<int>();
             foreach (int pid in elig)
             {
                 var p = players[pid];
                 if (p.data.Folded) continue;
-                var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(data.Community ?? new List<Card>());
+                var all = new List<Card>();
+                all.AddRange(p.data.Hole ?? new List<Card>());
+                all.AddRange(data.Community ?? new List<Card>());
                 long sc = HandEvaluator.EvaluateBest(all);
-                if (sc > best) { best = sc; winners.Clear(); winners.Add(pid); }
-                else if (sc == best) winners.Add(pid);
+                Debug.Log($"Evaluate P{pid + 1}: hand=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] community=[{string.Join(" ", data.Community ?? new List<Card>())}] score={sc}");
+                if (sc > best)
+                {
+                    best = sc; winners.Clear(); winners.Add(pid);
+                }
+                else if (sc == best)
+                    winners.Add(pid);
             }
             if (winners.Count == 0) continue;
             int share = amount / winners.Count;
+            Debug.Log($"Pot winners=[{string.Join(",", winners)}], share={share}");
             foreach (var w in winners)
             {
                 var pd = players[w].data;
                 pd.Stack = pd.Stack + share;
+                Debug.Log($"Awarded P{w + 1} +{share} => newStack={pd.Stack}");
             }
         }
 
         foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.data.Stack}");
 
-        ui?.UpdatePot(data.Pot);
+        yield return ui?.UpdatePot(data.Pot);
 
         dealerIndex = (dealerIndex + 1) % numPlayers;
         yield break;
@@ -222,12 +239,14 @@ public class PokerGame : MonoBehaviour
     private System.Collections.IEnumerator RunBettingRound(ERoundPhase phase)
     {
         int n = players.Count;
+        Debug.Log($"RunBettingRound: phase={phase}, players={n}");
         for (int i = 0; i < n; i++)
         {
 
             Player p = players[i];
             // Notify UI which player is acting
-            ui?.HighlightPlayer(i);
+            ui?.HighlightPlayer(i + 1);
+            Debug.Log($"Player to act: seat={i + 1}, name={p.name}, folded={p.data.Folded}, allin={p.data.AllIn}, stack={p.data.Stack}, currentBet={p.data.CurrentBet}");
             // If a HumanPlayerUI is available, use it for every seat (no AI)
             if (humanUI != null)
             {
@@ -235,6 +254,8 @@ public class PokerGame : MonoBehaviour
                 humanUI.ShowForSeat(i, phase);
                 // wait for player action
                 yield return p.Act(phase);
+                // after action, log resulting state
+                Debug.Log($"Post-action P{i + 1}: folded={p.data.Folded}, allin={p.data.AllIn}, currentBet={p.data.CurrentBet}, stack={p.data.Stack}");
                 yield return null;
             }
             else
