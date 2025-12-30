@@ -177,6 +177,17 @@ public class PokerGame : MonoBehaviour
         Debug.Log("--- 摊牌与派彩 ---");
         var pots = CollectPots();
 
+        // Update the game-level pot value so UI and other systems can read it.
+        try
+        {
+            int totalPot = pots.Sum(p => p.amount);
+            data.Pot = totalPot;
+        }
+        catch
+        {
+            data.Pot = 0;
+        }
+
      
         foreach (var potInfo in pots)
         {
