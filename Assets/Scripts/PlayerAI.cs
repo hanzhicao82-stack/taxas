@@ -33,9 +33,11 @@ public static class PlayerAI
             if (p.data.Stack <= need)
             {
                 // 筹码不足则全下
-                p.data.CurrentBet = p.data.CurrentBet + p.data.Stack;
+                int paidAll = p.data.Stack;
+                p.data.CurrentBet = p.data.CurrentBet + paidAll;
                 p.data.Stack = 0;
                 p.data.AllIn = true;
+                if (game != null) game.data.Pot += paidAll;
                 Debug.Log($"P{p.id + 1} 全下 {p.data.CurrentBet}");
                 return true;
             }
@@ -64,8 +66,10 @@ public static class PlayerAI
                 {
                     int raise = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * (raiseBase + (p.data.Aggression - 1f) * raiseScale)));
                     raise = Mathf.Max(raise, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
-                    p.data.Stack = p.data.Stack - (need + raise);
-                    p.data.CurrentBet = p.data.CurrentBet + (need + raise);
+                    int paid = Mathf.Min(p.data.Stack, need + raise);
+                    p.data.Stack = p.data.Stack - paid;
+                    p.data.CurrentBet = p.data.CurrentBet + paid;
+                    if (game != null) game.data.Pot += paid;
                     game.data.CurrentBet = p.data.CurrentBet;
                     Debug.Log($"P{p.id + 1} 加注 {raise}, 新当前注额={game.currentBet} (胜率={winProb:F2})");
                     return true;
@@ -74,6 +78,7 @@ public static class PlayerAI
                 // 否则跟注
                 p.data.Stack = p.data.Stack - need;
                 p.data.CurrentBet = p.data.CurrentBet + need;
+                if (game != null) game.data.Pot += need;
                 Debug.Log($"P{p.id + 1} 跟注 {need} (胜率={winProb:F2} 底池赔率={potOdds:F2})");
                 return true;
             }
@@ -88,6 +93,7 @@ public static class PlayerAI
                 bet = Mathf.Min(p.data.Stack, bet + extra);
                 p.data.Stack = p.data.Stack - bet;
                 p.data.CurrentBet = p.data.CurrentBet + bet;
+                if (game != null) game.data.Pot += bet;
                 game.data.CurrentBet = p.data.CurrentBet;
                 Debug.Log($"P{p.id + 1} 下注 {bet} (胜率={winProb:F2})");
                 return true;

@@ -115,6 +115,7 @@ public class Player
                     int pay2 = Mathf.Min(need, data.Stack);
                     data.Stack -= pay2;
                     data.CurrentBet += pay2;
+                    if (game != null) game.data.Pot += pay2;
                     if (data.Stack <= 0) data.AllIn = true;
                 }
                 break;
@@ -123,6 +124,7 @@ public class Player
                     int pay = Mathf.Min(need, data.Stack);
                     data.Stack -= pay;
                     data.CurrentBet += pay;
+                    if (game != null) game.data.Pot += pay;
                     if (data.Stack <= 0) data.AllIn = true;
                 }
                 break;
@@ -134,6 +136,7 @@ public class Player
                     int pay = Mathf.Min(desired, data.Stack);
                     data.Stack -= pay;
                     data.CurrentBet += pay;
+                    if (game != null) game.data.Pot += pay;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                     if (data.Stack <= 0) data.AllIn = true;
                 }
@@ -147,6 +150,7 @@ public class Player
                     int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
                     data.Stack -= totalPay;
                     data.CurrentBet += totalPay;
+                    if (game != null) game.data.Pot += totalPay;
                     if (data.Stack <= 0) data.AllIn = true;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                 }
@@ -155,6 +159,7 @@ public class Player
                 {
                     int payAll = data.Stack;
                     data.CurrentBet += payAll;
+                    if (game != null) game.data.Pot += payAll;
                     data.Stack = 0;
                     data.AllIn = true;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
