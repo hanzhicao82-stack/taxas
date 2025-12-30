@@ -207,19 +207,19 @@ public class UIManager : MonoBehaviour
         vlg.childForceExpandHeight = false; vlg.childForceExpandWidth = true; vlg.childAlignment = TextAnchor.UpperLeft;
         var csf = paramsContainerGO.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        raiseProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseProbability : 0.12f, out raiseProbLabel, "加注概率", font, uiScale);
-        betProbSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.betProbability : 0.06f, out betProbLabel, "下注概率", font, uiScale);
-        raiseBaseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 5f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeBase : 0.5f, out raiseBaseLabel, "基础加注", font, uiScale);
-        raiseScaleSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 3f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeAggressionScale : 1f, out raiseScaleLabel, "激进系数", font, uiScale);
-        minRaiseSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 0.5f, out minRaiseLabel, "最小加注比例", font, uiScale);
-        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 20, out simIterLabel, "模拟次数", font, uiScale);
+        raiseProbSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseProbability : 0.12f, "加注概率", font);
+        betProbSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.betProbability : 0.06f, "下注概率", font);
+        raiseBaseSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 0f, 5f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeBase : 0.5f, "基础加注", font);
+        raiseScaleSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 0f, 3f, (game != null && game.aiConfig != null) ? game.aiConfig.raiseSizeAggressionScale : 1f, "激进系数", font);
+        minRaiseSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 0f, 1f, (game != null && game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 0.5f, "最小加注比例", font);
+        simIterSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 10f, 1000f, (game != null && game.aiConfig != null) ? game.aiConfig.simIterations : 20, "模拟次数", font);
         simIterSlider.wholeNumbers = true;
 
-        numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, out numPlayersLabel, "玩家数", font, uiScale);
+        numPlayersSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 2f, 8f, game != null ? game.numPlayers : 4f, "玩家数", font);
         numPlayersSlider.wholeNumbers = true;
-        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.data.SmallBlindAmount : 5f, out smallBlindLabel, "小盲注", font, uiScale);
+        smallBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 1f, 100f, (game != null) ? game.data.SmallBlindAmount : 5f, "小盲注", font);
         smallBlindSlider.wholeNumbers = true;
-        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, Vector2.zero, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.data.BigBlindAmount : 10f, out bigBlindLabel, "大盲注", font, uiScale);
+        bigBlindSlider = CreateLabeledSlider(paramsContainerGO.transform, new Vector2(300, 18) * uiScale, 1f, 500f, (game != null) ? game.data.BigBlindAmount : 10f, "大盲注", font);
         bigBlindSlider.wholeNumbers = true;
 
         // Start button (use helper)
@@ -835,8 +835,9 @@ public class UIManager : MonoBehaviour
 
 
     // Helper to create a labeled slider. Returns the Slider and outputs the label Text.
-    private Slider CreateLabeledSlider(Transform parent, Vector2 anchoredPos, Vector2 size, float min, float max, float initial, out Text labelOut, string name, Font font, float uiScale)
+    private Slider CreateLabeledSlider(Transform parent, Vector2 size, float min, float max, float initial, string name, Font font, Action<float, Text> onValueChanged = null)
     {
+        float uiScale = 1f;
         // Row container with HorizontalLayoutGroup
         var row = new GameObject(name + "_Row");
         row.transform.SetParent(parent, false);
@@ -863,11 +864,15 @@ public class UIManager : MonoBehaviour
         var sliderGO = new GameObject(name + "_Slider");
         sliderGO.transform.SetParent(row.transform, false);
         var sliderRt = sliderGO.AddComponent<RectTransform>();
+        // ensure the slider rect matches the requested size so background/fill stretch correctly
+        sliderRt.sizeDelta = size;
         var sliderLE = sliderGO.AddComponent<LayoutElement>(); sliderLE.flexibleWidth = 1; sliderLE.preferredHeight = size.y;
 
         var slider = sliderGO.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
-        slider.minValue = min; slider.maxValue = max; slider.wholeNumbers = false;
+        slider.minValue = min;
+        slider.maxValue = max;
+        slider.wholeNumbers = false;
 
         // Background
         var bg = new GameObject("Background"); bg.transform.SetParent(sliderGO.transform, false);
@@ -898,9 +903,15 @@ public class UIManager : MonoBehaviour
 
         slider.value = initial;
         lbl.text = name + "： " + slider.value.ToString("0.##");
-        slider.onValueChanged.AddListener((v) => { lbl.text = name + "： " + v.ToString("0.##"); });
-
-        labelOut = lbl;
+        slider.onValueChanged.AddListener((v) =>
+        {
+            if (onValueChanged != null)
+            {
+                onValueChanged(v, lbl);
+            }
+            else
+                lbl.text = name + "： " + v.ToString("0.##");
+        });
         return slider;
     }
 
