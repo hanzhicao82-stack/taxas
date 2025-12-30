@@ -32,6 +32,7 @@ public class PokerGameFlowTest : MonoBehaviour
         {
             var p = new Player(i, "P" + (i + 1));
             p.data.Stack = 1000; // 每位玩家初始筹码
+            p.data.initialStack  = p.data.Stack;
             game.players.Add(p);
         }
 

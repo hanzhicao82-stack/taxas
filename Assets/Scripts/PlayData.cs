@@ -47,6 +47,8 @@ public class PlayData
     public Data<bool> ActiveData = new Data<bool>(true);
     public Data<float> AggressionData = new Data<float>(1.0f);
 
+    public int initialStack = 1000;
+
     // Direct properties for convenient get/set (no need to use .Value/Set)
     public int Stack { get => StackData.Value; set => StackData.Set(value); }
     public List<Card> Hole { get => HoleData.Value; set => HoleData.Set(value); }

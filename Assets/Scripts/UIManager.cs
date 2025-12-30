@@ -582,39 +582,65 @@ public class UIManager : MonoBehaviour
     public IEnumerator ShowResult(int pot)
     {
         UpdatePotText(pot);
+        yield return ShowWinners();
         yield return new WaitForSeconds(2f);
     }
 
-    // Display winner(s) for the hand. Accepts player indices (0-based).
-    public void ShowWinners(List<int> winners)
+    // Display a ranked leaderboard for the current players sorted by profit (收益).
+    // This coroutine builds a simple text leaderboard from highest to lowest profit
+    // (profit = current stack - initialStack), displays it in `resultText`, waits,
+    // then clears the text.
+    IEnumerator ShowWinners()
     {
-        if (resultText == null) return;
-        if (winners == null || winners.Count == 0)
+        if (resultText == null)
         {
-            // show "no winners" briefly
-            if (winnerCoroutine != null) StopCoroutine(winnerCoroutine);
-            winnerCoroutine = StartCoroutine(ShowWinnersRoutine("胜者：无", 3f));
-            return;
+            yield break;
         }
-        // Map indices to player names when possible
-        string[] names = winners.Select(i =>
+
+        var players = game?.players;
+        if (players == null || players.Count == 0)
         {
-            if (game != null && game.players != null && i >= 0 && i < game.players.Count) return game.players[i].name;
-            return $"P{i + 1}";
-        }).ToArray();
-        string text = "胜者：" + string.Join(", ", names);
-        if (winnerCoroutine != null) StopCoroutine(winnerCoroutine);
-        winnerCoroutine = StartCoroutine(ShowWinnersRoutine(text, 3f));
+            resultText.text = "排行榜：无玩家";
+            yield return new WaitForSeconds(2f);
+            resultText.text = "";
+            yield break;
+        }
+
+        // Create a list of (name, profit) and sort by profit descending
+        var entries = new List<(string name, int profit)>();
+        foreach (var p in players)
+        {
+            if (p == null) continue;
+            int initial = 0;
+            int stack = 0;
+            if (p.data != null)
+            {
+                initial = p.data.initialStack;
+                stack = p.data.Stack;
+            }
+            entries.Add((p.name ?? "Player", stack - initial));
+        }
+
+        entries.Sort((a, b) => b.profit.CompareTo(a.profit));
+
+        var sb = new StringBuilder();
+        sb.AppendLine("排行榜：");
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            string profitStr = (e.profit >= 0) ? $"+{e.profit}" : e.profit.ToString();
+            sb.AppendLine($"{i + 1}. {e.name} ({profitStr})");
+        }
+
+        // Show the leaderboard for a few seconds
+        resultText.text = sb.ToString().TrimEnd('\n', '\r');
+        resultText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        resultText.verticalOverflow = VerticalWrapMode.Overflow;
+        yield return new WaitForSeconds(4f);
+        resultText.text = "";
     }
 
-    private IEnumerator ShowWinnersRoutine(string text, float dur)
-    {
-        resultText.text = text;
-        yield return new WaitForSeconds(dur);
-        // clear result text after duration
-        resultText.text = "";
-        winnerCoroutine = null;
-    }
+
 
     // Highlight the current acting player's label by enlarging font size by 50%.
     public void HighlightPlayer(int seat)

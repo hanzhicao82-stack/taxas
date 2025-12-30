@@ -176,6 +176,8 @@ public class PokerGame : MonoBehaviour
         phase = Phase.Showdown;
         Debug.Log("--- Showdown & Payout ---");
         var pots = CollectPots();
+
+     
         foreach (var potInfo in pots)
         {
             int amount = potInfo.amount;
@@ -194,12 +196,16 @@ public class PokerGame : MonoBehaviour
                 Debug.Log($"Evaluate P{pid + 1}: hand=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] community=[{string.Join(" ", data.Community ?? new List<Card>())}] score={sc}");
                 if (sc > best)
                 {
-                    best = sc; winners.Clear(); winners.Add(pid);
+                    best = sc; 
+                    winners.Clear(); winners.Add(pid);
                 }
                 else if (sc == best)
+                {
                     winners.Add(pid);
+                }
             }
-            if (winners.Count == 0) continue;
+            if (winners.Count == 0) 
+            continue;
             int share = amount / winners.Count;
             Debug.Log($"Pot winners=[{string.Join(",", winners)}], share={share}");
             foreach (var w in winners)
