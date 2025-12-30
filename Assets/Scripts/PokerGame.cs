@@ -79,7 +79,7 @@ public class PokerGame : MonoBehaviour
 
     public System.Collections.IEnumerator StartHandRoutine()
     {
-        Debug.Log($"StartHandRoutine: dealer={dealerIndex + 1}, numPlayers={numPlayers}");
+        Debug.Log($"开始发牌流程：庄家={dealerIndex + 1}, 玩家数={numPlayers}");
         if (humanUI == null)
         {
             humanUI = UnityEngine.Object.FindObjectOfType<HumanPlayerUI>();
@@ -121,7 +121,7 @@ public class PokerGame : MonoBehaviour
             var h = players[i].data.Hole;
             if (h != null && h.Count >= 2)
             {
-                Debug.Log($"Dealt to P{i + 1}: {h[0]} {h[1]}");
+                Debug.Log($"发牌给 P{i + 1}: {h[0]} {h[1]}");
             }
         }
 
@@ -130,7 +130,7 @@ public class PokerGame : MonoBehaviour
 
         // Preflop
         phase = Phase.Preflop;
-        Debug.Log("--- Preflop: 开始下注轮 ---");
+        Debug.Log("--- 预翻牌阶段: 开始下注轮 ---");
         yield return StartCoroutine(RunBettingRound(ERoundPhase.Preflop));
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -141,7 +141,7 @@ public class PokerGame : MonoBehaviour
             var flopAdded = new List<Card> { deck.Draw(), deck.Draw(), deck.Draw() };
             data.Community.AddRange(flopAdded);
             data.CurrentBet = 0;
-            Debug.Log("--- Flop: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            Debug.Log("--- 翻牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.Flop));
         }
@@ -154,7 +154,7 @@ public class PokerGame : MonoBehaviour
             var turnAdded = new List<Card> { deck.Draw() };
             data.Community.AddRange(turnAdded);
             data.CurrentBet = 0;
-            Debug.Log("--- Turn: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            Debug.Log("--- 转牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.Turn));
         }
@@ -167,14 +167,14 @@ public class PokerGame : MonoBehaviour
             var riverAdded = new List<Card> { deck.Draw() };
             data.Community.AddRange(riverAdded);
             data.CurrentBet = 0;
-            Debug.Log("--- River: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+            Debug.Log("--- 河牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.River));
         }
 
         // Showdown & payout
         phase = Phase.Showdown;
-        Debug.Log("--- Showdown & Payout ---");
+        Debug.Log("--- 摊牌与派彩 ---");
         var pots = CollectPots();
 
      
@@ -182,7 +182,7 @@ public class PokerGame : MonoBehaviour
         {
             int amount = potInfo.amount;
             var elig = potInfo.eligible;
-            Debug.Log($"Payout pot amount={amount}, eligible=[{string.Join(",", elig)}]");
+            Debug.Log($"派彩：底池金额={amount}, 有资格的玩家=[{string.Join(",", elig)}]");
             long best = -1;
             List<int> winners = new List<int>();
             foreach (int pid in elig)
@@ -193,7 +193,7 @@ public class PokerGame : MonoBehaviour
                 all.AddRange(p.data.Hole ?? new List<Card>());
                 all.AddRange(data.Community ?? new List<Card>());
                 long sc = HandEvaluator.EvaluateBest(all);
-                Debug.Log($"Evaluate P{pid + 1}: hand=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] community=[{string.Join(" ", data.Community ?? new List<Card>())}] score={sc}");
+                Debug.Log($"计算 P{pid + 1}：手牌=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] 公共牌=[{string.Join(" ", data.Community ?? new List<Card>())}] 得分={sc}");
                 if (sc > best)
                 {
                     best = sc; 
@@ -207,16 +207,16 @@ public class PokerGame : MonoBehaviour
             if (winners.Count == 0) 
             continue;
             int share = amount / winners.Count;
-            Debug.Log($"Pot winners=[{string.Join(",", winners)}], share={share}");
+            Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}");
             foreach (var w in winners)
             {
                 var pd = players[w].data;
                 pd.Stack = pd.Stack + share;
-                Debug.Log($"Awarded P{w + 1} +{share} => newStack={pd.Stack}");
+                Debug.Log($"发放 P{w + 1} +{share} => 新筹码={pd.Stack}");
             }
         }
 
-        foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.data.Stack}");
+        foreach (var p in players) Debug.LogWarning($"P{p.id + 1} 筹码={p.data.Stack}");
 
         yield return ui?.ShowResult(data.Pot);
 
@@ -240,7 +240,7 @@ public class PokerGame : MonoBehaviour
         bPlayer.data.CurrentBet = bPlayer.data.CurrentBet + postedBB;
 
         data.CurrentBet = postedBB;
-        Debug.Log($"Blinds: P{sb + 1} posts SB={postedSB}, P{bb + 1} posts BB={postedBB}");
+        Debug.Log($"盲注：P{sb + 1} 支付 小盲={postedSB}, P{bb + 1} 支付 大盲={postedBB}");
     }
 
     private int GetFirstToActAfterBigBlind() => (dealerIndex + 3) % numPlayers;
@@ -251,14 +251,14 @@ public class PokerGame : MonoBehaviour
     private System.Collections.IEnumerator RunBettingRound(ERoundPhase phase)
     {
         int n = players.Count;
-        Debug.Log($"RunBettingRound: phase={phase}, players={n}");
+        Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}");
         for (int i = 0; i < n; i++)
         {
 
             Player p = players[i];
             // Notify UI which player is acting
             ui?.HighlightPlayer(i + 1);
-            Debug.Log($"Player to act: seat={i + 1}, name={p.name}, folded={p.data.Folded}, allin={p.data.AllIn}, stack={p.data.Stack}, currentBet={p.data.CurrentBet}");
+            Debug.Log($"当前行动玩家: 座位={i + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
             // If a HumanPlayerUI is available, use it for every seat (no AI)
             if (humanUI != null)
             {
@@ -267,7 +267,7 @@ public class PokerGame : MonoBehaviour
                 // wait for player action
                 yield return p.Act(phase);
                 // after action, log resulting state
-                Debug.Log($"Post-action P{i + 1}: folded={p.data.Folded}, allin={p.data.AllIn}, currentBet={p.data.CurrentBet}, stack={p.data.Stack}");
+                Debug.Log($"行动后 P{i + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
                 yield return null;
             }
             else
