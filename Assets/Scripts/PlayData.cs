@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 /// <summary>
 /// Generic wrapper that holds a value and notifies listeners when it changes.
@@ -50,7 +51,16 @@ public class PlayData
     public int initialStack = 1000;
 
     // Direct properties for convenient get/set (no need to use .Value/Set)
-    public int Stack { get => StackData.Value; set => StackData.Set(value); }
+    public int Stack
+    {
+        get => StackData.Value;
+        set
+        {
+            // UnityEngine.Debug.Log($"Stack changed from {StackData.Value} to {value}");
+            StackData.Set(value);
+        }
+    }
+
     public List<Card> Hole { get => HoleData.Value; set => HoleData.Set(value); }
     public int CurrentBet { get => CurrentBetData.Value; set => CurrentBetData.Set(value); }
     public bool Folded { get => FoldedData.Value; set => FoldedData.Set(value); }
@@ -81,5 +91,6 @@ public class PlayData
         Folded = false;
         AllIn = false;
         Active = true;
+        Stack = initialStack;
     }
 }

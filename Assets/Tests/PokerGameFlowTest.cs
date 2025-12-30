@@ -32,7 +32,7 @@ public class PokerGameFlowTest : MonoBehaviour
         {
             var p = new Player(i, "P" + (i + 1));
             p.data.Stack = 1000; // 每位玩家初始筹码
-            p.data.initialStack  = p.data.Stack;
+            p.data.initialStack = p.data.Stack;
             game.players.Add(p);
         }
 
@@ -40,9 +40,10 @@ public class PokerGameFlowTest : MonoBehaviour
         Debug.Log($"Initial total chips = {initialTotal}");
 
         // 运行若干手牌并在每手后检查基本不变量（每手之间让出一帧，避免阻塞主线程）
-        for (int h = 0; h < handsToPlay; h++)        {
-  
-            yield return StartCoroutine(game.StartHandRoutine());     
+        for (int h = 0; h < handsToPlay; h++)
+        {
+            game.Reset();
+            yield return StartCoroutine(game.StartHandRoutine());
             int total = game.players.Sum(p => p.data.Stack);
             if (total != initialTotal)
             {

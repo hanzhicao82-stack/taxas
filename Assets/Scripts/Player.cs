@@ -22,7 +22,7 @@ public enum EPlayerAction
 
 public class Player
 {
-
+    public static Player current = null;
     protected bool acting = false;
 
     /// <summary>Player index (0-based).</summary>
@@ -55,13 +55,16 @@ public class Player
     {
         if (CanAct())
         {
+            Player.current = this;
             BindUI(phase);
+
             acting = true;
             while (acting)
             {
                 yield return null;
             }
             HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
+            Player.current = null;
         }
         else
         {
@@ -70,7 +73,7 @@ public class Player
 
     }
 
-   
+
 
     bool CanAct()
     {
@@ -116,7 +119,8 @@ public class Player
                     data.Stack -= pay2;
                     data.CurrentBet += pay2;
                     if (game != null) game.data.Pot += pay2;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    if (data.Stack <= 0)
+                        data.AllIn = true;
                 }
                 break;
             case EPlayerAction.Call:
@@ -125,7 +129,8 @@ public class Player
                     data.Stack -= pay;
                     data.CurrentBet += pay;
                     if (game != null) game.data.Pot += pay;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    if (data.Stack <= 0)
+                        data.AllIn = true;
                 }
                 break;
             case EPlayerAction.Bet:
@@ -138,7 +143,8 @@ public class Player
                     data.CurrentBet += pay;
                     if (game != null) game.data.Pot += pay;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    if (data.Stack <= 0)
+                        data.AllIn = true;
                 }
                 break;
             case EPlayerAction.Raise:
@@ -151,7 +157,8 @@ public class Player
                     data.Stack -= totalPay;
                     data.CurrentBet += totalPay;
                     if (game != null) game.data.Pot += totalPay;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    if (data.Stack <= 0)
+                        data.AllIn = true;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                 }
                 break;

@@ -77,6 +77,12 @@ public class PokerGame : MonoBehaviour
     }
 
 
+    public void Reset()
+    {
+        pot = 0;
+        currentBet = 0;
+    }
+
     public System.Collections.IEnumerator StartHandRoutine()
     {
         Debug.Log($"开始发牌流程：庄家={dealerIndex + 1}, 玩家数={numPlayers}");
@@ -98,11 +104,9 @@ public class PokerGame : MonoBehaviour
         yield return null;
         yield return null;
 
-        if (players == null || players.Count != numPlayers)
-        {
-            players = new List<Player>();
-            for (int i = 0; i < numPlayers; i++) players.Add(new Player(i, "P" + (i + 1)));
-        }
+        players = new List<Player>();
+        for (int i = 0; i < numPlayers; i++)
+            players.Add(new Player(i, "P" + (i + 1)));
 
         foreach (var p in players) p.ResetForHand();
         foreach (var p in players) p.data.Aggression = UnityEngine.Random.Range(0.2f, 1.5f);
@@ -188,7 +192,7 @@ public class PokerGame : MonoBehaviour
             data.Pot = 0;
         }
 
-     
+
         foreach (var potInfo in pots)
         {
             int amount = potInfo.amount;
@@ -207,7 +211,7 @@ public class PokerGame : MonoBehaviour
                 Debug.Log($"计算 P{pid + 1}：手牌=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] 公共牌=[{string.Join(" ", data.Community ?? new List<Card>())}] 得分={sc}");
                 if (sc > best)
                 {
-                    best = sc; 
+                    best = sc;
                     winners.Clear(); winners.Add(pid);
                 }
                 else if (sc == best)
@@ -215,8 +219,8 @@ public class PokerGame : MonoBehaviour
                     winners.Add(pid);
                 }
             }
-            if (winners.Count == 0) 
-            continue;
+            if (winners.Count == 0)
+                continue;
             int share = amount / winners.Count;
             Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}");
             foreach (var w in winners)
