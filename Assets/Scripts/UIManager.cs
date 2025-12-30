@@ -60,7 +60,7 @@ public class UIManager : MonoBehaviour
 
         var root = canvas.transform;
 
-       
+
         // Ensure an EventSystem exists so UI (Slider, Buttons) can receive input
         if (UnityEngine.Object.FindObjectOfType<EventSystem>() == null)
         {
@@ -578,9 +578,28 @@ public class UIManager : MonoBehaviour
         if (potText != null) potText.text = "底池：" + pot.ToString();
     }
 
-    public void UpdatePot(int pot)
+    public IEnumerator ShowResult(int pot)
     {
         UpdatePotText(pot);
+        yield return new WaitForSeconds(2f);
+    }
+
+    // Display winner(s) for the hand. Accepts player indices (0-based).
+    public void ShowWinners(List<int> winners)
+    {
+        if (resultText == null) return;
+        if (winners == null || winners.Count == 0)
+        {
+            resultText.text = "胜者：无";
+            return;
+        }
+        // Map indices to player names when possible
+        string[] names = winners.Select(i =>
+        {
+            if (game != null && game.players != null && i >= 0 && i < game.players.Count) return game.players[i].name;
+            return $"P{i + 1}";
+        }).ToArray();
+        resultText.text = "胜者：" + string.Join(", ", names);
     }
 
     // Highlight the current acting player's label by enlarging font size by 50%.

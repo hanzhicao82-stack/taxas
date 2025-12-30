@@ -206,7 +206,7 @@ public class PokerGame : MonoBehaviour
 
         foreach (var p in players) Debug.LogWarning($"P{p.id + 1} stack={p.data.Stack}");
 
-        yield return ui?.UpdatePot(data.Pot);
+        yield return ui?.ShowResult(data.Pot);
 
         dealerIndex = (dealerIndex + 1) % numPlayers;
         yield break;
