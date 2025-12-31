@@ -136,6 +136,13 @@ public class PokerGame : MonoBehaviour
         Debug.Log("--- 预翻牌阶段: 开始下注轮 ---");
         yield return StartCoroutine(RunBettingRound(ERoundPhase.Preflop));
 
+        // Normalize per-round bet state before progressing to next street:
+        // - players' CurrentBet represent this betting round and should be cleared
+        // - game-level currentBet/data.CurrentBet should be reset to 0 so next street allows Check
+        for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
+        data.CurrentBet = 0;
+        currentBet = 0;
+
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
             // Flop
@@ -147,6 +154,11 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 翻牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.Flop));
+
+            // clear per-round bets again before next street
+            for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
+            data.CurrentBet = 0;
+            currentBet = 0;
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -160,6 +172,11 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 转牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.Turn));
+
+            // clear per-round bets again before next street
+            for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
+            data.CurrentBet = 0;
+            currentBet = 0;
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
@@ -173,6 +190,11 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 河牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
             yield return StartCoroutine(RunBettingRound(ERoundPhase.River));
+
+            // clear per-round bets before showdown
+            for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
+            data.CurrentBet = 0;
+            currentBet = 0;
         }
 
         // Showdown & payout
