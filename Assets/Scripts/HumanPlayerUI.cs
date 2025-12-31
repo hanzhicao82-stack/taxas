@@ -424,7 +424,11 @@ public class HumanPlayerUI : MonoBehaviour
         {
             int stack = game.players[currentSeat].data.Stack;
             amount = Mathf.RoundToInt(betSlider.value * stack);
-            int minAllowed = Mathf.Max(1, game.data.BigBlindAmount);
+            int bigBlind = Mathf.Max(1, game.data.BigBlindAmount);
+            int minAllowed = Mathf.Max(bigBlind, 1);
+            // Quantize amount to multiples of big blind (floor to avoid exceeding stack)
+            int multiples = Mathf.Max(1, Mathf.FloorToInt((float)amount / bigBlind));
+            amount = multiples * bigBlind;
             amount = Mathf.Clamp(amount, minAllowed, stack);
         }
         OnAction?.Invoke(EPlayerAction.Bet, amount == 0 ? 0 : amount);
@@ -454,17 +458,28 @@ public class HumanPlayerUI : MonoBehaviour
             betPanel.SetActive(true);
             if (betSlider != null)
             {
-                betSlider.value = 0.1f;
-                // update label immediately
                 var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
-
-
-                if (betValueLabel != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                int stack = 0;
+                int bigBlind = 1;
+                if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
                 {
-                    int stack = game.players[currentSeat].data.Stack;
-                    int betVal = Mathf.RoundToInt(Player.current.data.Stack * betSlider.value);
-                    betValueLabel.text = Mathf.RoundToInt(betSlider.value * 100f) + "%" + " 投注(" + betVal + ")";
+                    stack = game.players[currentSeat].data.Stack;
+                    bigBlind = Mathf.Max(1, game.data.BigBlindAmount);
                 }
+                float minFrac = (stack > 0) ? Mathf.Clamp01((float)bigBlind / Mathf.Max(1, stack)) : 0f;
+                betSlider.minValue = minFrac;
+                betSlider.maxValue = 1f;
+                betSlider.value = Mathf.Clamp(betSlider.value, minFrac, 1f);
+                betSlider.onValueChanged.RemoveAllListeners();
+                betSlider.onValueChanged.AddListener((v) =>
+                {
+                    int s = stack;
+                    if (game != null && currentSeat >= 0 && currentSeat < game.players.Count) s = game.players[currentSeat].data.Stack;
+                    int chips = Mathf.RoundToInt(v * s);
+                    if (betValueLabel != null) betValueLabel.text = Mathf.RoundToInt(v * 100f) + "%" + " 投注(" + chips + ")";
+                });
+                // initialize label
+                betSlider.onValueChanged.Invoke(betSlider.value);
             }
         }
     }

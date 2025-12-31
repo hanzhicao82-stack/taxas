@@ -104,10 +104,6 @@ public class PokerGame : MonoBehaviour
         yield return null;
         yield return null;
 
-        players = new List<Player>();
-        for (int i = 0; i < numPlayers; i++)
-            players.Add(new Player(i, "P" + (i + 1)));
-
         foreach (var p in players) p.ResetForHand();
         foreach (var p in players) p.data.Aggression = UnityEngine.Random.Range(0.2f, 1.5f);
 

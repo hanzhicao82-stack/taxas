@@ -406,8 +406,9 @@ public class UIManager : MonoBehaviour
             playerTextGOs.Add(tgo);
         }
 
+
         // update the label for this player
-        UpdatePlayerLabel(idx);
+        UpdatePlayerLabel(player);
 
         // refresh playerTexts array and base sizes/colors
         var labelsList = new List<Text>();
@@ -513,19 +514,20 @@ public class UIManager : MonoBehaviour
     private class DataSubs { public Action<int, int> stack; public Action<List<Card>, List<Card>> hole; public Action<int, int> bet; public Action<bool, bool> folded; public Action<bool, bool> allin; }
     private List<DataSubs> dataSubs = new List<DataSubs>();
 
+
+
+
     private void UnsubscribeAllPlayerData()
     {
         if (game == null || game.players == null) return;
         for (int i = 0; i < dataSubs.Count && i < game.players.Count; i++)
         {
             var p = game.players[i];
-            var s = dataSubs[i];
-            if (s == null || p == null) continue;
-            if (s.stack != null) p.data.StackData.OnValueChanged -= s.stack;
-            if (s.hole != null) p.data.HoleData.OnValueChanged -= s.hole;
-            if (s.bet != null) p.data.CurrentBetData.OnValueChanged -= s.bet;
-            if (s.folded != null) p.data.FoldedData.OnValueChanged -= s.folded;
-            if (s.allin != null) p.data.AllInData.OnValueChanged -= s.allin;
+            var subs = dataSubs[i];
+            if (subs.stack != null)
+                p.data.StackData.OnValueChanged -= subs.stack;
+            if (subs.folded != null)
+                p.data.FoldedData.OnValueChanged -= subs.folded;
         }
         dataSubs.Clear();
     }
@@ -534,44 +536,41 @@ public class UIManager : MonoBehaviour
     {
         UnsubscribeAllPlayerData();
         if (game == null || game.players == null) return;
+        dataSubs = new List<DataSubs>();
         for (int i = 0; i < game.players.Count; i++)
         {
             var p = game.players[i];
-            var s = new DataSubs();
-            int idx = i;
-            s.stack = (oldv, newv) => UpdatePlayerLabel(idx);
-            s.hole = (oldv, newv) => UpdatePlayerLabel(idx);
-            s.bet = (oldv, newv) => { UpdatePlayerLabel(idx); UpdatePotText(game.data.Pot); };
-            s.folded = (oldv, newv) => UpdatePlayerLabel(idx);
-            s.allin = (oldv, newv) => UpdatePlayerLabel(idx);
-            p.data.StackData.OnValueChanged += s.stack;
-            p.data.HoleData.OnValueChanged += s.hole;
-            p.data.CurrentBetData.OnValueChanged += s.bet;
-            p.data.FoldedData.OnValueChanged += s.folded;
-            p.data.AllInData.OnValueChanged += s.allin;
-            dataSubs.Add(s);
+            var subs = new DataSubs();
+            subs.stack = (oldv, newv) =>
+            {
+                UpdatePlayerLabel(p);
+            };
+            p.data.StackData.OnValueChanged += subs.stack;
+            subs.folded = (oldv, newv) =>
+            {
+                UpdatePlayerLabel(p);
+            };
+            p.data.FoldedData.OnValueChanged += subs.folded;
+            dataSubs.Add(subs);
         }
         // initial update
         for (int i = 0; i < game.players.Count && i < playerTextGOs.Count; i++)
-            UpdatePlayerLabel(i);
+            UpdatePlayerLabel(game.players[i]);
     }
 
-    private void UpdatePlayerLabel(int i)
+    private void UpdatePlayerLabel(Player player)
     {
-        if (game == null || game.players == null) return;
-        if (i < 0 || i >= game.players.Count) return;
-        if (playerTextGOs == null || i >= playerTextGOs.Count) return;
-        var p = game.players[i];
+        int i = player.id;
         var label = playerTextGOs[i].transform.Find("Label")?.GetComponent<Text>() ?? playerTextGOs[i].GetComponentInChildren<Text>();
         if (label == null) return;
         string holeStr = "";
-        var holeList = p.data.Hole;
+        var holeList = player.data.Hole;
         if (holeList != null && holeList.Count >= 2)
         {
             holeStr = $"{holeList[0]} {holeList[1]} ";
         }
         label.horizontalOverflow = HorizontalWrapMode.Overflow;
-        label.text = $"{p.name}：{holeStr}筹码：{p.data.Stack}";
+        label.text = $"{player.name}：{holeStr}筹码：{player.data.Stack}";
     }
 
     private void UpdatePotText(int pot)
@@ -720,7 +719,7 @@ public class UIManager : MonoBehaviour
         // Create and run the test runner while hiding settings
         var tester = new GameObject("Test");
 
-        
+
         var flowTest = tester.AddComponent<PokerGameFlowTest>();
         CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
 

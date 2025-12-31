@@ -125,10 +125,22 @@ public class Player
                 break;
             case EPlayerAction.Call:
                 {
+                    // Follow standard call semantics:
+                    // - `need` is how much the player must add to match `game.currentBet`.
+                    // - If `need <= 0` there's nothing to call (should be a check); do nothing here.
+                    // - The player pays at most their remaining stack (all-in allowed).
+                    // - If the player cannot fully cover `need` (all-in), their `CurrentBet` will be
+                    //   less than `game.currentBet` and side-pot logic elsewhere should handle it.
+                    if (need <= 0)
+                        break;
+
                     int pay = Mathf.Min(need, data.Stack);
+                    // Deduct chips from the player's stack and add to their current bet
                     data.Stack -= pay;
                     data.CurrentBet += pay;
+                    // Immediately reflect the paid chips in the main pot
                     if (game != null) game.data.Pot += pay;
+                    // If the player used all chips mark as all-in
                     if (data.Stack <= 0)
                         data.AllIn = true;
                 }
