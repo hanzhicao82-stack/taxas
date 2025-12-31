@@ -570,6 +570,7 @@ public class UIManager : MonoBehaviour
             holeStr = $"{holeList[0]} {holeList[1]} ";
         }
         label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
         label.text = $"{player.name}：{holeStr}筹码：{player.data.Stack}";
     }
 
@@ -661,7 +662,7 @@ public class UIManager : MonoBehaviour
                 t.fontSize = baseSize;
                 // restore base color if available
                 if (playerBaseColors != null && i < playerBaseColors.Length)
-                    t.color = playerBaseColors[i];
+                    t.color = Color.white;
             }
         }
     }
