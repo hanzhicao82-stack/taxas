@@ -114,6 +114,9 @@ public class PokerGame : MonoBehaviour
         deck = new Deck();
         deck.Shuffle();
         data.ClearCommunity();
+        // ensure PokerData reflects the configured blind sizes
+        data.SmallBlindAmount = smallBlindAmount;
+        data.BigBlindAmount = bigBlindAmount;
         data.Pot = 0;
         data.CurrentBet = 0;
 
@@ -254,7 +257,12 @@ public class PokerGame : MonoBehaviour
         bPlayer.data.Stack = bPlayer.data.Stack - postedBB;
         bPlayer.data.CurrentBet = bPlayer.data.CurrentBet + postedBB;
 
+        // add blinds to the game pot so UI and logic see the initial money in pot
+        data.Pot += postedSB + postedBB;
+        // set the current bet to the big blind and sync the game-level field
         data.CurrentBet = postedBB;
+        currentBet = data.CurrentBet;
+        pot = data.Pot;
         Debug.Log($"盲注：P{sb + 1} 支付 小盲={postedSB}, P{bb + 1} 支付 大盲={postedBB}");
     }
 

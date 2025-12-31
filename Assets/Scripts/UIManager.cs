@@ -552,8 +552,8 @@ public class UIManager : MonoBehaviour
             dataSubs.Add(s);
         }
         // initial update
-        for (int i = 0; i < game.players.Count && i < playerTextGOs.Count; i++) UpdatePlayerLabel(i);
-        UpdatePotText(game.data.Pot);
+        for (int i = 0; i < game.players.Count && i < playerTextGOs.Count; i++)
+            UpdatePlayerLabel(i);
     }
 
     private void UpdatePlayerLabel(int i)
@@ -576,12 +576,12 @@ public class UIManager : MonoBehaviour
 
     private void UpdatePotText(int pot)
     {
-        if (potText != null) potText.text = "底池：" + pot.ToString();
+        if (potText != null)
+            potText.text = "底池：" + pot.ToString();
     }
 
     public IEnumerator ShowResult(int pot)
     {
-        UpdatePotText(pot);
         yield return ShowWinners();
         yield return new WaitForSeconds(2f);
     }
@@ -713,22 +713,25 @@ public class UIManager : MonoBehaviour
         }
 
         // Apply number of players and blinds to the active game if present
-        int players = (numPlayersSlider != null) ? Mathf.RoundToInt(numPlayersSlider.value) : ((game != null) ? game.numPlayers : 4);
-        int small = (smallBlindSlider != null) ? Mathf.RoundToInt(smallBlindSlider.value) : ((game != null) ? game.data.SmallBlindAmount : 5);
-        int big = (bigBlindSlider != null) ? Mathf.RoundToInt(bigBlindSlider.value) : ((game != null) ? game.data.BigBlindAmount : 10);
+        int players = Mathf.RoundToInt(numPlayersSlider.value);
+        int small = Mathf.RoundToInt(smallBlindSlider.value);
+        int big = Mathf.RoundToInt(bigBlindSlider.value);
+
+        // Create and run the test runner while hiding settings
+        var tester = new GameObject("Test");
+
+        
+        var flowTest = tester.AddComponent<PokerGameFlowTest>();
+        CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
+
         if (game != null)
         {
             game.numPlayers = players;
             game.data.SmallBlindAmount = small;
             game.data.BigBlindAmount = big;
             game.aiConfig = cfg;
+            game.data.PotData.OnValueChanged += (oldv, newv) => UpdatePotText(newv);
         }
-
-        // Create and run the test runner while hiding settings
-        var tester = new GameObject("Test");
-        var flowTest = tester.AddComponent<PokerGameFlowTest>();
-        CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
-
 
 
         int initialCount = (game != null && game.players != null) ? game.players.Count : 0;

@@ -155,15 +155,13 @@ public class HumanPlayerUI : MonoBehaviour
         var foldB = makeBtn("Fold");
         var callB = makeBtn("Call");
         var checkB = makeBtn("Check");
-
         var raiseB = makeBtn("Raise");
         // Tweak labels and colors
-        allinB.GetComponentInChildren<Text>().text = "All-In"; allinB.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
-        foldB.GetComponentInChildren<Text>().text = "Fold"; foldB.GetComponent<Image>().color = new Color(0.8f, 0.1f, 0.1f);
-        callB.GetComponentInChildren<Text>().text = "Call"; callB.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
-        checkB.GetComponentInChildren<Text>().text = "Check"; checkB.GetComponent<Image>().color = new Color(0.4f, 0.4f, 0.4f);
-
-        raiseB.GetComponentInChildren<Text>().text = "Raise"; raiseB.GetComponent<Image>().color = new Color(0.1f, 0.4f, 0.9f);
+        allinB.GetComponentInChildren<Text>().text = "全下"; allinB.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
+        foldB.GetComponentInChildren<Text>().text = "弃牌"; foldB.GetComponent<Image>().color = new Color(0.8f, 0.1f, 0.1f);
+        callB.GetComponentInChildren<Text>().text = "跟注"; callB.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
+        checkB.GetComponentInChildren<Text>().text = "过牌"; checkB.GetComponent<Image>().color = new Color(0.4f, 0.4f, 0.4f);
+        raiseB.GetComponentInChildren<Text>().text = "加注"; raiseB.GetComponent<Image>().color = new Color(0.1f, 0.4f, 0.9f);
         seatText.fontSize = 20; seatText.fontStyle = FontStyle.Bold;
         var seatShadow = seatLabelGO.AddComponent<Shadow>(); seatShadow.effectColor = new Color(0f, 0f, 0f, 0.6f); seatShadow.effectDistance = new Vector2(2, -2);
 
