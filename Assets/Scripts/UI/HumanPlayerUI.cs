@@ -311,8 +311,18 @@ public class HumanPlayerUI : MonoBehaviour
     // If need == 0, allow Check and Bet; otherwise allow Call and Raise.
     public void ConfigureForNeed(int need)
     {
-        if (checkButton != null) checkButton.interactable = (need == 0);
-        if (callButton != null) callButton.interactable = (need > 0);
+        if (checkButton != null)
+        {
+            checkButton.interactable = (need == 0);
+            var txt = checkButton.GetComponentInChildren<Text>();
+            if (txt != null) txt.text = (need == 0) ? "过牌" : "过牌(需跟注)";
+        }
+        if (callButton != null)
+        {
+            callButton.interactable = (need > 0);
+            var txt = callButton.GetComponentInChildren<Text>();
+            if (txt != null) txt.text = (need > 0) ? "跟注" : "跟注";
+        }
         if (raiseButton != null) raiseButton.interactable = (need > 0);
         if (allinButton != null) allinButton.interactable = true;
         if (foldButton != null) foldButton.interactable = true;
