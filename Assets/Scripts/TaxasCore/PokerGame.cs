@@ -302,6 +302,8 @@ public class PokerGame : MonoBehaviour
             Debug.Log($"当前行动玩家: 座位={i + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
             if (humanUI != null)
             {
+                int need = Math.Max(0, currentBet - p.data.CurrentBet);
+                humanUI.ConfigureForNeed(need);
                 humanUI.ShowForSeat(i, phase);
                 yield return p.Act(phase);
                 Debug.Log($"行动后 P{i + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
