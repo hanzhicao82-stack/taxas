@@ -12,14 +12,31 @@ using System.Collections;
 
 public enum EPlayerAction
 {
+    //summary> Player actions during betting rounds. </summary>
+    //summary> 下注轮次中的玩家操作。 </summary>
     Fold,
+    //summary> Check action (no additional bet). </summary>
+    //summary> 过牌操作（不追加下注）。 </summary>
     Check,
+    //summary> Call action (match current bet). </summary>
+    //summary> 跟注操作（匹配当前下注）。 </summary>
     Call,
+    //summary> Bet action (initial bet). </summary> 
+    //summary> 下注操作（初始下注）。 </summary>
     Bet,
+    //summary> Raise action (increase current bet). </summary>
+    //summary> 加注操作（增加当前下注）。 </summary>
     Raise,
+    //summary> All-in action (bet all remaining chips). </summary>
+    //summary> 全下操作（下注所有剩余筹码）。 </summary>
     AllIn
 }
 
+/// <summary>
+/// Player model used by the game loop and UI.
+/// - Mutable per-hand fields (stack/current bet/fold/all-in) are stored in `data` (`PlayData`).
+/// - `Act()` drives per-player coroutine-based action flow for UI-driven play.
+/// </summary>
 public class Player
 {
     public static Player current = null;
@@ -55,16 +72,21 @@ public class Player
     {
         if (CanAct())
         {
-            Player.current = this;
-            BindUI(phase);
-
+            // Begin a coroutine that waits until the UI (or AI) invokes an action
+            // via HumanPlayerUI.Instance.OnAction which calls HandlePlayerAction.
             acting = true;
+            current = this;
+            BindUI(phase);
+            HumanPlayerUI.Instance.OnAction += HandlePlayerAction;
+            // Pause here until HandlePlayerAction sets `acting = false`.
             while (acting)
             {
                 yield return null;
             }
+            // Clean up subscription and transient state
             HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
-            Player.current = null;
+            current = null;
+            acting = false;
         }
         else
         {
@@ -77,6 +99,7 @@ public class Player
 
     bool CanAct()
     {
+        // Player may act if not folded, not already all-in and has chips.
         return !data.Folded && !data.AllIn && data.Stack > 0;
     }
 
@@ -95,7 +118,7 @@ public class Player
                 HumanPlayerUI.Instance.ShowActionButtons();
                 break;
         }
-        HumanPlayerUI.Instance.OnAction += HandlePlayerAction;
+
     }
 
     protected void HandlePlayerAction(EPlayerAction action, params object[] args)
@@ -113,15 +136,13 @@ public class Player
                 data.Folded = true;
                 break;
             case EPlayerAction.Check:
+                // Strict behavior: Check is only valid when there is no outstanding bet.
                 if (need > 0)
                 {
-                    int pay2 = Mathf.Min(need, data.Stack);
-                    data.Stack -= pay2;
-                    data.CurrentBet += pay2;
-                    if (game != null) game.data.Pot += pay2;
-                    if (data.Stack <= 0)
-                        data.AllIn = true;
+                    Debug.LogWarning($"P{this.id + 1} attempted to Check but needs to call {need}.");
+                    // Do not pay automatically; require the player to choose Call/AllIn/Raise instead.
                 }
+                // If need == 0, Check is a no-op (allowed).
                 break;
             case EPlayerAction.Call:
                 {
@@ -135,7 +156,9 @@ public class Player
                         break;
 
                     int pay = Mathf.Min(need, data.Stack);
-                    // Deduct chips from the player's stack and add to their current bet
+                    // Deduct chips from the player's stack and add to their current bet.
+                    // Note: if `pay < need` the player is all-in with a smaller committed amount;
+                    // side-pot logic elsewhere (CollectPots) must handle this case.
                     data.Stack -= pay;
                     data.CurrentBet += pay;
                     // Immediately reflect the paid chips in the main pot
@@ -154,6 +177,7 @@ public class Player
                     data.Stack -= pay;
                     data.CurrentBet += pay;
                     if (game != null) game.data.Pot += pay;
+                    // Update game-level currentBet if this player's committed bet is now highest
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                     if (data.Stack <= 0)
                         data.AllIn = true;
@@ -172,6 +196,7 @@ public class Player
                     if (args != null && args.Length > 0 && args[0] is int)
                         amount = (int)args[0];
                     // 最小加注不低于大盲注（或 1）
+                    // Minimum raise amount: at least 1 or the big blind (game convention)
                     int minRaise = Mathf.Max(1, game.data.BigBlindAmount);
                     // 实际需要额外加注 = 玩家指定的 amount 与 minRaise 中的较大者
                     int desiredExtra = Mathf.Max(amount, minRaise);
@@ -192,6 +217,7 @@ public class Player
                 break;
             case EPlayerAction.AllIn:
                 {
+                    // Commit entire remaining stack to the pot and mark all-in.
                     int payAll = data.Stack;
                     data.CurrentBet += payAll;
                     if (game != null) game.data.Pot += payAll;
