@@ -16,8 +16,6 @@ public class HumanPlayerUI : MonoBehaviour
     [Tooltip("Optional Text used to show which seat is acting.")]
     public Text seatLabel;
     public int currentSeat = 1;
-    public Text hintLabel;
-    public float hintDuration = 2f;
 
     [Tooltip("Optional panel shown when entering a raise amount.")]
     public GameObject raisePanel;
@@ -257,13 +255,6 @@ public class HumanPlayerUI : MonoBehaviour
         betConf.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
         betCanc.GetComponent<Image>().color = new Color(0.6f, 0.1f, 0.1f);
 
-        // Hint label (small helper text shown above panel)
-        var hintGO = new GameObject("HintLabel"); hintGO.transform.SetParent(root.transform, false);
-        var hintRt = hintGO.AddComponent<RectTransform>(); hintRt.sizeDelta = new Vector2(400, 20);
-        hintRt.anchorMin = new Vector2(0.5f, 0); hintRt.anchorMax = new Vector2(0.5f, 0); hintRt.pivot = new Vector2(0.5f, 0); hintRt.anchoredPosition = new Vector2(0, 80);
-        var hintText = hintGO.AddComponent<Text>(); hintText.font = font; hintText.fontSize = 14; hintText.alignment = TextAnchor.MiddleCenter; hintText.color = Color.yellow; hintText.text = "";
-        hintGO.SetActive(false);
-
         // Wire references into HumanPlayerUI
         h.panel = panel;
         h.allinButton = allinB;
@@ -283,7 +274,6 @@ public class HumanPlayerUI : MonoBehaviour
         h.betConfirmButton = betConf;
         h.betCancelButton = betCanc;
         h.seatLabel = seatText;
-        h.hintLabel = hintText;
 
         return h;
     }
@@ -336,27 +326,6 @@ public class HumanPlayerUI : MonoBehaviour
         if (raiseButton != null) raiseButton.interactable = (need > 0);
         if (allinButton != null) allinButton.interactable = true;
         if (foldButton != null) foldButton.interactable = true;
-        // Show a short hint when Check is disabled to explain why
-        if (hintLabel != null)
-        {
-            if (need > 0)
-                ShowHint("过牌不可用：需先跟注或全下");
-        }
-    }
-
-    void ShowHint(string text)
-    {
-        if (hintLabel == null) return;
-        hintLabel.text = text;
-        hintLabel.gameObject.SetActive(true);
-        StopAllCoroutines();
-        StartCoroutine(HideHintAfter(hintDuration));
-    }
-
-    System.Collections.IEnumerator HideHintAfter(float t)
-    {
-        yield return new WaitForSeconds(t);
-        if (hintLabel != null) hintLabel.gameObject.SetActive(false);
     }
 
     public void Show()
