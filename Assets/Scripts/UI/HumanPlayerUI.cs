@@ -305,17 +305,17 @@ public class HumanPlayerUI : MonoBehaviour
         var btnRow2 = new GameObject("AllInButtons"); btnRow2.transform.SetParent(confirmPanel.transform, false);
         var brt2 = btnRow2.AddComponent<RectTransform>(); brt2.sizeDelta = new Vector2(300, 36);
         var hrow2 = btnRow2.AddComponent<HorizontalLayoutGroup>(); hrow2.spacing = 8; hrow2.childAlignment = TextAnchor.MiddleCenter; hrow2.childForceExpandWidth = false;
-        var confBtn = CreateSmall("全下", Vector2.zero, btnRow2.transform);
-        var cancelBtn = CreateSmall("取消", Vector2.zero, btnRow2.transform);
-        confBtn.GetComponentInChildren<Text>().text = "全下";
-        cancelBtn.GetComponentInChildren<Text>().text = "取消";
-        confBtn.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
-        cancelBtn.GetComponent<Image>().color = new Color(0.6f, 0.1f, 0.1f);
+        var allinConfBtn = CreateSmall("全下", Vector2.zero, btnRow2.transform);
+        var allinCancelBtn = CreateSmall("取消", Vector2.zero, btnRow2.transform);
+        allinConfBtn.GetComponentInChildren<Text>().text = "全下";
+        allinCancelBtn.GetComponentInChildren<Text>().text = "取消";
+        allinConfBtn.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
+        allinCancelBtn.GetComponent<Image>().color = new Color(0.6f, 0.1f, 0.1f);
         confirmPanel.SetActive(false);
 
         h.allinConfirmPanel = confirmPanel;
-        h.allinConfirmButton = confBtn;
-        h.allinCancelButton = cancelBtn;
+        h.allinConfirmButton = allinConfBtn;
+        h.allinCancelButton = allinCancelBtn;
 
         return h;
     }
@@ -543,7 +543,9 @@ public class HumanPlayerUI : MonoBehaviour
             // compute required minimum based on need + minRaise
             int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
             float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
-            int minRaise = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+            int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+            int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+            int minRaise = Mathf.Max(minByConfig, minByLastRaise);
             int minAllowed = Mathf.Max(1, need + minRaise);
             amount = Mathf.Clamp(amount, minAllowed, stack);
         }
