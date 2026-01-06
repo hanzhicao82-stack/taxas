@@ -85,6 +85,85 @@ public class Player
             data.AllIn = true;
     }
 
+    // Encapsulated handlers for player actions to keep switch body concise
+    private bool HandleFold()
+    {
+        data.Folded = true;
+        return true;
+    }
+
+    private bool HandleCheck(int need)
+    {
+        if (need > 0)
+        {
+            Debug.LogWarning($"P{this.id + 1} attempted to Check but needs to call {need}.");
+            return false;
+        }
+        return true;
+    }
+
+    private bool HandleCall(PokerGame game, int need)
+    {
+        if (need <= 0)
+            return false;
+
+        // If player does not have enough chips to fully call, do NOT auto-all-in here.
+        // Require the player to explicitly choose AllIn instead of silently committing a partial call.
+        if (data.Stack < need)
+        {
+            Debug.LogWarning($"P{this.id + 1} cannot Call: insufficient chips ({data.Stack} < {need}). Choose AllIn instead.");
+            return false;
+        }
+
+        int pay = Mathf.Min(need, data.Stack);
+        int beforeStack = data.Stack;
+        int beforeBet = data.CurrentBet;
+        ApplyPayment(pay, game);
+        Debug.Log($"P{this.id + 1} CALL pay={pay}, stackBefore={beforeStack}, stackAfter={data.Stack}, currentBetBefore={beforeBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
+        return true;
+    }
+
+    private bool HandleBet(PokerGame game, object[] args)
+    {
+        int amount = 0;
+        if (args != null && args.Length > 0 && args[0] is int) amount = (int)args[0];
+        int desired = Mathf.Max(amount, game.data.BigBlindAmount);
+        int pay = Mathf.Min(desired, data.Stack);
+        int beforeStackBet = data.Stack;
+        int beforeCurrentBet = data.CurrentBet;
+        ApplyPayment(pay, game);
+        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        Debug.Log($"P{this.id + 1} BET pay={pay}, stackBefore={beforeStackBet}, stackAfter={data.Stack}, currentBetBefore={beforeCurrentBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
+        return true;
+    }
+
+    private bool HandleRaise(PokerGame game, object[] args, int need)
+    {
+        int amount = 0;
+        if (args != null && args.Length > 0 && args[0] is int)
+            amount = (int)args[0];
+        int minRaise = Mathf.Max(1, game.data.BigBlindAmount);
+        int desiredExtra = Mathf.Max(amount, minRaise);
+        int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
+        int beforeStackRaise = data.Stack;
+        int beforeCB = data.CurrentBet;
+        ApplyPayment(totalPay, game);
+        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        Debug.Log($"P{this.id + 1} RAISE pay={totalPay}, stackBefore={beforeStackRaise}, stackAfter={data.Stack}, currentBetBefore={beforeCB}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
+        return true;
+    }
+
+    private bool HandleAllIn(PokerGame game)
+    {
+        int payAll = data.Stack;
+        int beforeStackAllIn = data.Stack;
+        int beforeCBA = data.CurrentBet;
+        ApplyPayment(payAll, game);
+        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        Debug.Log($"P{this.id + 1} ALLIN pay={payAll}, stackBefore={beforeStackAllIn}, stackAfter={data.Stack}, currentBetBefore={beforeCBA}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
+        return true;
+    }
+
     // Async version of Act() which awaits UI action via TaskCompletionSource
     private TaskCompletionSource<bool> actionTcs;
     public async Task ActAsync(ERoundPhase phase)
@@ -149,101 +228,33 @@ public class Player
             return;
         }
         int need = game.currentBet - data.CurrentBet;
+        bool handled = false;
         switch (action)
         {
             case EPlayerAction.Fold:
-                data.Folded = true;
+                handled = HandleFold();
                 break;
             case EPlayerAction.Check:
-                // Strict behavior: Check is only valid when there is no outstanding bet.
-                if (need > 0)
-                {
-                    Debug.LogWarning($"P{this.id + 1} attempted to Check but needs to call {need}.");
-                    // Do not pay automatically; require the player to choose Call/AllIn/Raise instead.
-                }
-                // If need == 0, Check is a no-op (allowed).
+                handled = HandleCheck(need);
                 break;
             case EPlayerAction.Call:
-                {
-                    // Follow standard call semantics:
-                    // - `need` is how much the player must add to match `game.currentBet`.
-                    // - If `need <= 0` there's nothing to call (should be a check); do nothing here.
-                    // - The player pays at most their remaining stack (all-in allowed).
-                    // - If the player cannot fully cover `need` (all-in), their `CurrentBet` will be
-                    //   less than `game.currentBet` and side-pot logic elsewhere should handle it.
-                    if (need <= 0)
-                        break;
-                    int pay = Mathf.Min(need, data.Stack);
-                        // If player does not have enough chips to fully call, do NOT auto-all-in here.
-                        // Require the player to explicitly choose AllIn instead of silently committing a partial call.
-                        if (data.Stack < need)
-                        {
-                            Debug.LogWarning($"P{this.id + 1} cannot Call: insufficient chips ({data.Stack} < {need}). Choose AllIn instead.");
-                            break;
-                        }
-                    int beforeStack = data.Stack;
-                    int beforeBet = data.CurrentBet;
-                    ApplyPayment(pay, game);
-                    Debug.Log($"P{this.id + 1} CALL pay={pay}, stackBefore={beforeStack}, stackAfter={data.Stack}, currentBetBefore={beforeBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
-                }
+                handled = HandleCall(game, need);
                 break;
             case EPlayerAction.Bet:
-                {
-                    int amount = 0;
-                    if (args != null && args.Length > 0 && args[0] is int) amount = (int)args[0];
-                    int desired = Mathf.Max(amount, game.data.BigBlindAmount);
-                    int pay = Mathf.Min(desired, data.Stack);
-                    int beforeStackBet = data.Stack;
-                    int beforeCurrentBet = data.CurrentBet;
-                    ApplyPayment(pay, game);
-                    if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    Debug.Log($"P{this.id + 1} BET pay={pay}, stackBefore={beforeStackBet}, stackAfter={data.Stack}, currentBetBefore={beforeCurrentBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
-                }
+                handled = HandleBet(game, args);
                 break;
             case EPlayerAction.Raise:
-                {
-                    // 用户选择加注：
-                    // - 从参数中读取玩家想要额外加注的 `amount`（以筹码为单位）。
-                    // - 计算最小加注额 `minRaise`（至少为大盲注或 1），并取两者较大值作为实际额外需求 `desiredExtra`。
-                    // - 总共支付的金额为当前跟注需求 `need` 加上 `desiredExtra`，但不能超过玩家剩余筹码 `data.Stack`。
-                    // - 从玩家 `data.Stack` 扣除该金额，增加 `data.CurrentBet`，并立即将该金额加入游戏的 `data.Pot`，
-                    //   以便 UI 和其他逻辑能实时看到底池变化。
-                    // - 若玩家耗尽筹码则标记为 All-In，并在必要时更新游戏的 `currentBet`。
-                    int amount = 0;
-                    if (args != null && args.Length > 0 && args[0] is int)
-                        amount = (int)args[0];
-                    // 最小加注不低于大盲注（或 1）
-                    // Minimum raise amount: at least 1 or the big blind (game convention)
-                    int minRaise = Mathf.Max(1, game.data.BigBlindAmount);
-                    // 实际需要额外加注 = 玩家指定的 amount 与 minRaise 中的较大者
-                    int desiredExtra = Mathf.Max(amount, minRaise);
-                    // 总共要支付 = 需要跟注的金额 + 额外加注；不能超过玩家当前筹码
-                    int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
-                    int beforeStackRaise = data.Stack;
-                    int beforeCB = data.CurrentBet;
-                    ApplyPayment(totalPay, game);
-                    if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    Debug.Log($"P{this.id + 1} RAISE pay={totalPay}, stackBefore={beforeStackRaise}, stackAfter={data.Stack}, currentBetBefore={beforeCB}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
-                }
+                handled = HandleRaise(game, args, need);
                 break;
             case EPlayerAction.AllIn:
-                {
-                    // Commit entire remaining stack to the pot and mark all-in.
-                    int payAll = data.Stack;
-                    int beforeStackAllIn = data.Stack;
-                    int beforeCBA = data.CurrentBet;
-                    ApplyPayment(payAll, game);
-                    if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    Debug.Log($"P{this.id + 1} ALLIN pay={payAll}, stackBefore={beforeStackAllIn}, stackAfter={data.Stack}, currentBetBefore={beforeCBA}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
-                }
+                handled = HandleAllIn(game);
                 break;
         }
-        // Signal awaiting ActAsync if present
-        try
+        // Only signal completion if the handler actually applied an action
+        if (handled)
         {
-            actionTcs?.TrySetResult(true);
+            try { actionTcs?.TrySetResult(true); } catch { }
+            acting = false;
         }
-        catch { }
-        acting = false;
     }
 }
