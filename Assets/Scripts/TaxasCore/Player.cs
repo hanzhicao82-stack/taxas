@@ -156,16 +156,14 @@ public class Player
                         break;
 
                     int pay = Mathf.Min(need, data.Stack);
-                    // Deduct chips from the player's stack and add to their current bet.
-                    // Note: if `pay < need` the player is all-in with a smaller committed amount;
-                    // side-pot logic elsewhere (CollectPots) must handle this case.
+                    int beforeStack = data.Stack;
+                    int beforeBet = data.CurrentBet;
                     data.Stack -= pay;
                     data.CurrentBet += pay;
-                    // Immediately reflect the paid chips in the main pot
+                    data.TotalCommitted += pay;
                     if (game != null) game.data.Pot += pay;
-                    // If the player used all chips mark as all-in
-                    if (data.Stack <= 0)
-                        data.AllIn = true;
+                    if (data.Stack <= 0) data.AllIn = true;
+                    Debug.Log($"P{this.id + 1} CALL pay={pay}, stackBefore={beforeStack}, stackAfter={data.Stack}, currentBetBefore={beforeBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
             case EPlayerAction.Bet:
@@ -174,13 +172,15 @@ public class Player
                     if (args != null && args.Length > 0 && args[0] is int) amount = (int)args[0];
                     int desired = Mathf.Max(amount, game.data.BigBlindAmount);
                     int pay = Mathf.Min(desired, data.Stack);
+                    int beforeStackBet = data.Stack;
+                    int beforeCurrentBet = data.CurrentBet;
                     data.Stack -= pay;
                     data.CurrentBet += pay;
+                    data.TotalCommitted += pay;
                     if (game != null) game.data.Pot += pay;
-                    // Update game-level currentBet if this player's committed bet is now highest
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    if (data.Stack <= 0)
-                        data.AllIn = true;
+                    if (data.Stack <= 0) data.AllIn = true;
+                    Debug.Log($"P{this.id + 1} BET pay={pay}, stackBefore={beforeStackBet}, stackAfter={data.Stack}, currentBetBefore={beforeCurrentBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
             case EPlayerAction.Raise:
@@ -202,28 +202,30 @@ public class Player
                     int desiredExtra = Mathf.Max(amount, minRaise);
                     // 总共要支付 = 需要跟注的金额 + 额外加注；不能超过玩家当前筹码
                     int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
+                    int beforeStackRaise = data.Stack;
+                    int beforeCB = data.CurrentBet;
                     data.Stack -= totalPay;
                     data.CurrentBet += totalPay;
-                    // 立即更新游戏层的底池，保证 UI/其他系统可见
-                    if (game != null)
-                        game.data.Pot += totalPay;
-                    // 如果耗尽筹码，标记为全下
-                    if (data.Stack <= 0)
-                        data.AllIn = true;
-                    // 如果当前下注超过 game.currentBet，则更新游戏的 currentBet
-                    if (data.CurrentBet > game.currentBet)
-                        game.currentBet = data.CurrentBet;
+                    data.TotalCommitted += totalPay;
+                    if (game != null) game.data.Pot += totalPay;
+                    if (data.Stack <= 0) data.AllIn = true;
+                    if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+                    Debug.Log($"P{this.id + 1} RAISE pay={totalPay}, stackBefore={beforeStackRaise}, stackAfter={data.Stack}, currentBetBefore={beforeCB}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
             case EPlayerAction.AllIn:
                 {
                     // Commit entire remaining stack to the pot and mark all-in.
                     int payAll = data.Stack;
+                    int beforeStackAllIn = data.Stack;
+                    int beforeCBA = data.CurrentBet;
                     data.CurrentBet += payAll;
+                    data.TotalCommitted += payAll;
                     if (game != null) game.data.Pot += payAll;
                     data.Stack = 0;
                     data.AllIn = true;
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+                    Debug.Log($"P{this.id + 1} ALLIN pay={payAll}, stackBefore={beforeStackAllIn}, stackAfter={data.Stack}, currentBetBefore={beforeCBA}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
         }

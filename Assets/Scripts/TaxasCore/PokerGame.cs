@@ -29,7 +29,6 @@ public class PokerGame : MonoBehaviour
     public int numPlayers = 4;
     public List<Player> players = new List<Player>();
     public PokerData data = new PokerData();
-
     private Deck deck;
     public UIManager ui;
     public HumanPlayerUI humanUI;
@@ -47,7 +46,14 @@ public class PokerGame : MonoBehaviour
     // 本轮的当前最高下注（其他玩家需要跟注到此数）；注意这与每位玩家的 data.CurrentBet 不同
     public int currentBet = 0;
 
-    private enum Phase { Preflop, Flop, Turn, River, Showdown }
+    private enum Phase
+    {
+        Preflop,
+        Flop, //翻牌
+        Turn,
+        River,
+        Showdown
+    }
     private Phase phase;
 
     void Start()
@@ -88,6 +94,13 @@ public class PokerGame : MonoBehaviour
     {
         pot = 0;
         currentBet = 0;
+        // Also clear data-backed pot/currentBet to avoid stale values between tests
+        try
+        {
+            data.Pot = 0;
+            data.CurrentBet = 0;
+        }
+        catch { }
     }
 
     public System.Collections.IEnumerator StartHandRoutine()
@@ -215,6 +228,7 @@ public class PokerGame : MonoBehaviour
         // Showdown & payout
         phase = Phase.Showdown;
         Debug.Log("--- 摊牌与派彩 ---");
+        Debug.Log($"Before CollectPots: players stacks=[{string.Join(",", players.Select(p=>$"{p.id}:{p.data.Stack}"))}], currentBets=[{string.Join(",", players.Select(p=>p.data.CurrentBet))}]");
         var pots = CollectPots();
 
         // Update the game-level pot value so UI and other systems can read it.
@@ -258,12 +272,15 @@ public class PokerGame : MonoBehaviour
             if (winners.Count == 0)
                 continue;
             int share = amount / winners.Count;
-            Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}");
-            foreach (var w in winners)
+            int remainder = amount - share * winners.Count;
+            Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}, 余数={remainder}");
+            for (int idx = 0; idx < winners.Count; idx++)
             {
+                var w = winners[idx];
                 var pd = players[w].data;
-                pd.Stack = pd.Stack + share;
-                Debug.Log($"发放 P{w + 1} +{share} => 新筹码={pd.Stack}");
+                int give = share + (idx < remainder ? 1 : 0);
+                pd.Stack = pd.Stack + give;
+                Debug.Log($"发放 P{w + 1} +{give} => 新筹码={pd.Stack}");
             }
         }
 
@@ -280,8 +297,7 @@ public class PokerGame : MonoBehaviour
         DealerManager.PostBlinds(this);
     }
 
-    private int GetFirstToActAfterBigBlind() => (dealerIndex + 3) % numPlayers;
-    private int GetFirstToActAfterDealer() => (dealerIndex + 1) % numPlayers;
+
 
     private int ActivePlayersCountExcludingAllIn() => players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
 
@@ -326,7 +342,8 @@ public class PokerGame : MonoBehaviour
         // 池的 eligible 为所有 bet >= min 的玩家，然后从每个正 bet 中减去 min，直到都为 0。
         // 返回值为一系列 (amount, eligible)；函数结束后会清零 players[i].data.CurrentBet。
         var pots = new List<(int amount, List<int> eligible)>();
-        var bets = players.Select(p => p.data.CurrentBet).ToArray();
+        var bets = players.Select(p => p.data.TotalCommitted).ToArray();
+        Debug.Log($"CollectPots start (using TotalCommitted): bets=[{string.Join(",", bets)}]");
         while (bets.Any(b => b > 0))
         {
             int min = bets.Where(b => b > 0).Min();
@@ -337,13 +354,18 @@ public class PokerGame : MonoBehaviour
                 if (bets[i] >= min)
                     eligible.Add(i);
             pots.Add((amount, eligible));
+            Debug.Log($"CollectPots created pot: amount={amount}, eligible=[{string.Join(",", eligible)}]");
             for (int i = 0; i < bets.Length; i++)
                 if (bets[i] > 0)
                     bets[i] = Math.Max(0, bets[i] - min);
         }
-        // 清理每位玩家的 CurrentBet，为下一手或下一轮复用做准备
+        // 清理每位玩家的 CurrentBet 与 TotalCommitted，为下一手复用做准备
         foreach (var p in players)
+        {
             p.data.CurrentBet = 0;
+            p.data.TotalCommitted = 0;
+        }
+        Debug.Log($"CollectPots result: potsAmounts=[{string.Join(",", pots.Select(pp=>pp.amount))}], players CurrentBet and TotalCommitted cleared");
         return pots;
     }
 

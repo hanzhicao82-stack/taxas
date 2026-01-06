@@ -43,6 +43,7 @@ public class PlayData
     public Data<int> StackData = new Data<int>(1000);
     public Data<List<Card>> HoleData = new Data<List<Card>>(new List<Card>());
     public Data<int> CurrentBetData = new Data<int>(0);
+    public Data<int> TotalCommittedData = new Data<int>(0);
     public Data<bool> FoldedData = new Data<bool>(false);
     public Data<bool> AllInData = new Data<bool>(false);
     public Data<bool> ActiveData = new Data<bool>(true);
@@ -63,6 +64,7 @@ public class PlayData
 
     public List<Card> Hole { get => HoleData.Value; set => HoleData.Set(value); }
     public int CurrentBet { get => CurrentBetData.Value; set => CurrentBetData.Set(value); }
+    public int TotalCommitted { get => TotalCommittedData.Value; set => TotalCommittedData.Set(value); }
     public bool Folded { get => FoldedData.Value; set => FoldedData.Set(value); }
     public bool AllIn { get => AllInData.Value; set => AllInData.Set(value); }
     public bool Active { get => ActiveData.Value; set => ActiveData.Set(value); }
@@ -88,6 +90,7 @@ public class PlayData
     {
         ClearHole();
         CurrentBet = 0;
+        TotalCommitted = 0;
         Folded = false;
         AllIn = false;
         Active = true;
