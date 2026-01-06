@@ -374,6 +374,17 @@ public class HumanPlayerUI : MonoBehaviour
 
     void Call()
     {
+        var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+        if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+        {
+            var player = game.players[currentSeat];
+            int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
+            if (need > 0 && player.data.Stack < need)
+            {
+                ShowHint("筹码不足以跟注：点击 全下 以全下或取消");
+                return;
+            }
+        }
         OnAction?.Invoke(EPlayerAction.Call);
         Hide();
     }
@@ -450,8 +461,8 @@ public class HumanPlayerUI : MonoBehaviour
 
     private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
     {
-        yield return StartCoroutine(routine);
-        tcs.TrySetResult(true);
+        yield return routine;
+        try { tcs.TrySetResult(true); } catch { }
     }
 
     public Task HideHintAfterAsync(float t)

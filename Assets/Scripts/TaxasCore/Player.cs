@@ -69,17 +69,20 @@ public class Player
         data.ResetForHand();
     }
 
-    public IEnumerator Act(ERoundPhase phase)
+    // Helper to apply a payment from this player to the pot and update per-hand tracking
+    // - deducts from `data.Stack`
+    // - increases `data.CurrentBet` and `data.TotalCommitted`
+    // - updates `game.data.Pot` if `game` is provided
+    // - marks `data.AllIn` if stack reaches zero
+    private void ApplyPayment(int amount, PokerGame game = null)
     {
-        // Keep coroutine wrapper for compatibility with existing callers
-        var task = ActAsync(phase);
-        while (!task.IsCompleted)
-        {
-            yield return null;
-        }
-        if (task.IsFaulted) throw task.Exception;
-        yield break;
-
+        data.Stack -= amount;
+        data.CurrentBet += amount;
+        data.TotalCommitted += amount;
+        if (game != null)
+            game.data.Pot += amount;
+        if (data.Stack <= 0)
+            data.AllIn = true;
     }
 
     // Async version of Act() which awaits UI action via TaskCompletionSource
@@ -135,7 +138,6 @@ public class Player
                 HumanPlayerUI.Instance.ShowActionButtons();
                 break;
         }
-
     }
 
     protected void HandlePlayerAction(EPlayerAction action, params object[] args)
@@ -171,15 +173,17 @@ public class Player
                     //   less than `game.currentBet` and side-pot logic elsewhere should handle it.
                     if (need <= 0)
                         break;
-
                     int pay = Mathf.Min(need, data.Stack);
+                        // If player does not have enough chips to fully call, do NOT auto-all-in here.
+                        // Require the player to explicitly choose AllIn instead of silently committing a partial call.
+                        if (data.Stack < need)
+                        {
+                            Debug.LogWarning($"P{this.id + 1} cannot Call: insufficient chips ({data.Stack} < {need}). Choose AllIn instead.");
+                            break;
+                        }
                     int beforeStack = data.Stack;
                     int beforeBet = data.CurrentBet;
-                    data.Stack -= pay;
-                    data.CurrentBet += pay;
-                    data.TotalCommitted += pay;
-                    if (game != null) game.data.Pot += pay;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    ApplyPayment(pay, game);
                     Debug.Log($"P{this.id + 1} CALL pay={pay}, stackBefore={beforeStack}, stackAfter={data.Stack}, currentBetBefore={beforeBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
@@ -191,12 +195,8 @@ public class Player
                     int pay = Mathf.Min(desired, data.Stack);
                     int beforeStackBet = data.Stack;
                     int beforeCurrentBet = data.CurrentBet;
-                    data.Stack -= pay;
-                    data.CurrentBet += pay;
-                    data.TotalCommitted += pay;
-                    if (game != null) game.data.Pot += pay;
+                    ApplyPayment(pay, game);
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
-                    if (data.Stack <= 0) data.AllIn = true;
                     Debug.Log($"P{this.id + 1} BET pay={pay}, stackBefore={beforeStackBet}, stackAfter={data.Stack}, currentBetBefore={beforeCurrentBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
                 break;
@@ -221,11 +221,7 @@ public class Player
                     int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
                     int beforeStackRaise = data.Stack;
                     int beforeCB = data.CurrentBet;
-                    data.Stack -= totalPay;
-                    data.CurrentBet += totalPay;
-                    data.TotalCommitted += totalPay;
-                    if (game != null) game.data.Pot += totalPay;
-                    if (data.Stack <= 0) data.AllIn = true;
+                    ApplyPayment(totalPay, game);
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                     Debug.Log($"P{this.id + 1} RAISE pay={totalPay}, stackBefore={beforeStackRaise}, stackAfter={data.Stack}, currentBetBefore={beforeCB}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }
@@ -236,11 +232,7 @@ public class Player
                     int payAll = data.Stack;
                     int beforeStackAllIn = data.Stack;
                     int beforeCBA = data.CurrentBet;
-                    data.CurrentBet += payAll;
-                    data.TotalCommitted += payAll;
-                    if (game != null) game.data.Pot += payAll;
-                    data.Stack = 0;
-                    data.AllIn = true;
+                    ApplyPayment(payAll, game);
                     if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
                     Debug.Log($"P{this.id + 1} ALLIN pay={payAll}, stackBefore={beforeStackAllIn}, stackAfter={data.Stack}, currentBetBefore={beforeCBA}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
                 }

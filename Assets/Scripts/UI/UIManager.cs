@@ -272,8 +272,8 @@ public class UIManager : MonoBehaviour
 
     private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
     {
-        yield return StartCoroutine(routine);
-        tcs.TrySetResult(true);
+        yield return routine;
+        try { tcs.TrySetResult(true); } catch { }
     }
 
 
@@ -356,24 +356,24 @@ public class UIManager : MonoBehaviour
             Vector2 target = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
 
             // start movement coroutine
-            CoroutineTracker.Start(this, MoveRectTo(rt, target, dur));
+            StartCoroutine(MoveRectTo(rt, target, dur));
 
             // rotate whole object so card faces center
             float bgRot = angleDeg - 90f;
-            CoroutineTracker.Start(this, RotateRectTo(rt, bgRot, dur));
+            StartCoroutine(RotateRectTo(rt, bgRot, dur));
 
             // ensure label upright: set child Label rotation to 0 over same duration
             var labelTf = rt.transform.Find("Label");
             if (labelTf != null)
             {
-                CoroutineTracker.Start(this, RotateRectTo(labelTf.GetComponent<RectTransform>(), 0f, dur));
+                StartCoroutine(RotateRectTo(labelTf.GetComponent<RectTransform>(), 0f, dur));
             }
 
             // fade in if needed
             var cg = rt.GetComponent<CanvasGroup>();
             if (cg != null)
             {
-                CoroutineTracker.Start(this, FadeInCanvasGroup(cg, dur * 0.8f));
+                StartCoroutine(FadeInCanvasGroup(cg, dur * 0.8f));
             }
         }
         yield return new WaitForSeconds(dur);
@@ -404,18 +404,11 @@ public class UIManager : MonoBehaviour
         currentRunCoroutine = null;
         if (inner != null)
         {
-            currentRunCoroutine = CoroutineTracker.Start(this, RunInnerAndMark(inner));
+            currentRunCoroutine = StartCoroutine(RunInnerAndMark(inner));
             while (!currentRunFinished)
             {
                 await Task.Yield();
             }
-        }
-
-        // cleanup
-        if (currentRunCoroutine != null)
-        {
-            CoroutineTracker.Stop(this, currentRunCoroutine);
-            currentRunCoroutine = null;
         }
 
         SetActiveSafe(restartButtonGO, false);
@@ -496,7 +489,7 @@ public class UIManager : MonoBehaviour
         }
 
         // animate arrangement to account for new player element
-        CoroutineTracker.Start(this, ArrangePlayersSmooth(playerTextGOs, uiScale, 0.25f));
+        StartCoroutine(ArrangePlayersSmooth(playerTextGOs, uiScale, 0.25f));
     }
 
 
@@ -786,7 +779,7 @@ public class UIManager : MonoBehaviour
 
 
         var flowTest = tester.AddComponent<PokerGameFlowTest>();
-        CoroutineTracker.Start(this, RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
+        StartCoroutine(RunGameWithHiddenSettings(flowTest.Run(cfg, 10, players)));
 
         if (game != null)
         {
@@ -823,7 +816,7 @@ public class UIManager : MonoBehaviour
         currentRunCoroutine = null;
         if (inner != null)
         {
-            currentRunCoroutine = CoroutineTracker.Start(this, RunInnerAndMark(inner));
+            currentRunCoroutine = StartCoroutine(RunInnerAndMark(inner));
             while (!currentRunFinished)
             {
                 yield return null;
@@ -833,7 +826,7 @@ public class UIManager : MonoBehaviour
         // cleanup
         if (currentRunCoroutine != null)
         {
-            CoroutineTracker.Stop(this, currentRunCoroutine);
+            try { StopCoroutine(currentRunCoroutine); } catch { }
             currentRunCoroutine = null;
         }
 
@@ -859,7 +852,7 @@ public class UIManager : MonoBehaviour
         // Cancel running test and return to settings
         if (currentRunCoroutine != null)
         {
-            CoroutineTracker.Stop(this, currentRunCoroutine);
+            try { StopCoroutine(currentRunCoroutine); } catch { }
             currentRunCoroutine = null;
         }
         currentRunFinished = true;

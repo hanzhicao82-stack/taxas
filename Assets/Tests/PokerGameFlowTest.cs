@@ -75,10 +75,9 @@ public class PokerGameFlowTest : MonoBehaviour
     }
 
     // Helper: run an IEnumerator with a timeout, invoke callback with true if completed, false if timed out
-    private IEnumerator RunWithTimeout(IEnumerator routine, float timeoutSeconds, Action<bool> callback)
+    private async Task RunWithTimeoutAsync(IEnumerator routine, float timeoutSeconds, Action<bool> callback)
     {
         var start = Time.realtimeSinceStartup;
-        // Drive the inner routine manually
         var enumerator = routine;
         bool moveNext = true;
         while (true)
@@ -86,7 +85,7 @@ public class PokerGameFlowTest : MonoBehaviour
             if (Time.realtimeSinceStartup - start > timeoutSeconds)
             {
                 callback?.Invoke(false);
-                yield break;
+                return;
             }
 
             try
@@ -97,31 +96,28 @@ public class PokerGameFlowTest : MonoBehaviour
             {
                 Debug.LogError($"Exception in inner routine: {ex}");
                 callback?.Invoke(false);
-                yield break;
+                return;
             }
 
             if (!moveNext)
             {
                 callback?.Invoke(true);
-                yield break;
+                return;
             }
 
-            // If the inner yielded an IEnumerator, we should run it to completion before continuing
             var yielded = enumerator.Current;
             if (yielded is IEnumerator nested)
             {
-                yield return CoroutineTracker.Start(this, RunWithTimeout(nested, timeoutSeconds - (Time.realtimeSinceStartup - start), callback));
-                // If nested timed out (callback false) then propagate timeout
-                // Note: callback may have been invoked by nested; check elapsed
+                await RunWithTimeoutAsync(nested, timeoutSeconds - (Time.realtimeSinceStartup - start), callback);
                 if (Time.realtimeSinceStartup - start > timeoutSeconds)
                 {
-                    yield break;
+                    return;
                 }
             }
             else
             {
-                // Respect yielded instructions (WaitForSeconds, null, etc.) by yielding it
-                yield return yielded;
+                // Respect yielded instructions (WaitForSeconds, null, etc.) by yielding control for a frame
+                await Task.Yield();
             }
         }
     }

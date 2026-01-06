@@ -317,8 +317,8 @@ public class PokerGame : MonoBehaviour
 
     private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
     {
-        yield return StartCoroutine(routine);
-        tcs.TrySetResult(true);
+        yield return routine;
+        try { tcs.TrySetResult(true); } catch { }
     }
 
     private void PostBlinds()
