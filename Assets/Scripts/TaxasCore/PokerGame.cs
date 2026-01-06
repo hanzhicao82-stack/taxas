@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Linq;
+using System.Threading.Tasks;
 
 
 // 回合阶段枚举：用于标识当前是哪个下注阶段（预翻牌/翻牌/转牌/河牌/摊牌）
@@ -106,9 +107,21 @@ public class PokerGame : MonoBehaviour
     public System.Collections.IEnumerator StartHandRoutine()
     {
         // StartHandRoutine：整手牌的主流程（发牌 -> 逐街下注 -> 摊牌 -> 派彩）
-        // 关键点：每轮下注时玩家将筹码记入 players[i].data.CurrentBet，
-        // 在进入下一街前会清零该值以开始新一轮（除摊牌前我们保留以便 CollectPots 读取）。
-        // 协程设计方便 UI/玩家交互和 AI 延迟。
+        // 保留 coroutine 接口，内部委托给 Task-based 实现 StartHandAsync
+        var task = StartHandAsync();
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+        if (task.IsFaulted)
+        {
+            throw task.Exception;
+        }
+    }
+
+    // Async version of the main hand flow. Use await Task.Yield() where coroutines previously yielded.
+    public async Task StartHandAsync()
+    {
         Debug.Log($"开始发牌流程：庄家={dealerIndex + 1}, 玩家数={numPlayers}");
         if (humanUI == null)
         {
@@ -125,8 +138,8 @@ public class PokerGame : MonoBehaviour
             ui = UnityEngine.Object.FindObjectOfType<UIManager>();
         }
 
-        yield return null;
-        yield return null;
+        await Task.Yield();
+        await Task.Yield();
 
         foreach (var p in players) p.ResetForHand();
         foreach (var p in players) p.data.Aggression = UnityEngine.Random.Range(0.2f, 1.5f);
@@ -161,7 +174,7 @@ public class PokerGame : MonoBehaviour
         int preflopStart = (data.BigBlindAmount > 0)
             ? DealerManager.GetFirstToActAfterBigBlind(dealerIndex, numPlayers)
             : DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-        yield return StartCoroutine(RunBettingRound(ERoundPhase.Preflop, preflopStart));
+        await RunBettingRoundAsync(ERoundPhase.Preflop, preflopStart);
 
         // Normalize per-round bet state before progressing to next street:
         // - players' CurrentBet represent this betting round and should be cleared
@@ -181,7 +194,7 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 翻牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
             int postflopStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            yield return StartCoroutine(RunBettingRound(ERoundPhase.Flop, postflopStart));
+            await RunBettingRoundAsync(ERoundPhase.Flop, postflopStart);
 
             // clear per-round bets again before next street
             for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
@@ -200,7 +213,7 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 转牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
             int turnStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            yield return StartCoroutine(RunBettingRound(ERoundPhase.Turn, turnStart));
+            await RunBettingRoundAsync(ERoundPhase.Turn, turnStart);
 
             // clear per-round bets again before next street
             for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
@@ -219,7 +232,7 @@ public class PokerGame : MonoBehaviour
             Debug.Log("--- 河牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
             GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
             int riverStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            yield return StartCoroutine(RunBettingRound(ERoundPhase.River, riverStart));
+            await RunBettingRoundAsync(ERoundPhase.River, riverStart);
 
             // (Do not clear per-round bets here) — CollectPots() needs the
             // players' committed `CurrentBet` values to compute side pots.
@@ -286,9 +299,26 @@ public class PokerGame : MonoBehaviour
 
         foreach (var p in players) Debug.LogWarning($"P{p.id + 1} 筹码={p.data.Stack}");
 
-        yield return ui?.ShowResult(data.Pot);
+        if (ui != null)
+        {
+            await RunCoroutineAsTask(ui.ShowResult(data.Pot));
+        }
         DealerManager.AdvanceDealer(this);
-        yield break;
+        return;
+    }
+
+    // Helper to run an IEnumerator-returning routine and await its completion
+    private Task RunCoroutineAsTask(System.Collections.IEnumerator routine)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        StartCoroutine(RunCoroutineRoutine(routine, tcs));
+        return tcs.Task;
+    }
+
+    private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
+    {
+        yield return StartCoroutine(routine);
+        tcs.TrySetResult(true);
     }
 
     private void PostBlinds()
@@ -303,9 +333,19 @@ public class PokerGame : MonoBehaviour
 
     private System.Collections.IEnumerator RunBettingRound(ERoundPhase phase, int startIndex)
     {
-        // RunBettingRound：按座位顺序提示每位玩家行动（UI/highlight），
-        // 期望玩家在其 Player.Act() 中更新其 data.CurrentBet 与 data.Stack。
-        // 该方法不在此处处理具体下注策略（由 humanUI 或 AI 实现）。
+        // RunBettingRound coroutine kept for compatibility; delegates to RunBettingRoundAsync
+        var task = RunBettingRoundAsync(phase, startIndex);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+        if (task.IsFaulted) throw task.Exception;
+
+    }
+
+    // Async implementation of betting round
+    private async Task RunBettingRoundAsync(ERoundPhase phase, int startIndex)
+    {
         int n = players.Count;
         Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}, 起始座位={startIndex + 1}");
         for (int offset = 0; offset < n; offset++)
@@ -313,7 +353,6 @@ public class PokerGame : MonoBehaviour
             int i = (startIndex + offset) % n;
 
             Player p = players[i];
-            // Notify UI which player is acting
             ui?.HighlightPlayer(i + 1);
             Debug.Log($"当前行动玩家: 座位={i + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
             if (humanUI != null)
@@ -322,17 +361,16 @@ public class PokerGame : MonoBehaviour
                 bool canOpenBet = (currentBet == 0);
                 humanUI.ConfigureForNeed(need, canOpenBet);
                 humanUI.ShowForSeat(i, phase);
-                yield return p.Act(phase);
+                await p.ActAsync(phase);
                 Debug.Log($"行动后 P{i + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
-                yield return null;
+                await Task.Yield();
             }
             else
             {
                 // AI fallback currently not implemented here
             }
         }
-        yield return null;
-
+        await Task.Yield();
     }
 
     private List<(int amount, List<int> eligible)> CollectPots()

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using System.Threading.Tasks;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
@@ -429,13 +430,33 @@ public class HumanPlayerUI : MonoBehaviour
         hintLabel.text = text;
         hintLabel.gameObject.SetActive(true);
         StopAllCoroutines();
-        StartCoroutine(HideHintAfter(hintDuration));
+        // fire-and-forget async hide (keeps main-thread safety via coroutine under the hood)
+        _ = HideHintAfterAsync(hintDuration);
     }
 
     System.Collections.IEnumerator HideHintAfter(float t)
     {
         yield return new WaitForSeconds(t);
         if (hintLabel != null) hintLabel.gameObject.SetActive(false);
+    }
+
+    // Async wrapper around HideHintAfter coroutine for Task-based callers
+    private Task RunCoroutineAsTask(System.Collections.IEnumerator routine)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        StartCoroutine(RunCoroutineRoutine(routine, tcs));
+        return tcs.Task;
+    }
+
+    private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
+    {
+        yield return StartCoroutine(routine);
+        tcs.TrySetResult(true);
+    }
+
+    public Task HideHintAfterAsync(float t)
+    {
+        return RunCoroutineAsTask(HideHintAfter(t));
     }
 
     void HideHintImmediate()

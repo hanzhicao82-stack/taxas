@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Collections;
+using System.Threading.Tasks;
 
 /// <summary>
 /// Simple player model holding hole cards and basic metadata.
@@ -70,29 +71,45 @@ public class Player
 
     public IEnumerator Act(ERoundPhase phase)
     {
-        if (CanAct())
-        {
-            // Begin a coroutine that waits until the UI (or AI) invokes an action
-            // via HumanPlayerUI.Instance.OnAction which calls HandlePlayerAction.
-            acting = true;
-            current = this;
-            BindUI(phase);
-            HumanPlayerUI.Instance.OnAction += HandlePlayerAction;
-            // Pause here until HandlePlayerAction sets `acting = false`.
-            while (acting)
-            {
-                yield return null;
-            }
-            // Clean up subscription and transient state
-            HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
-            current = null;
-            acting = false;
-        }
-        else
+        // Keep coroutine wrapper for compatibility with existing callers
+        var task = ActAsync(phase);
+        while (!task.IsCompleted)
         {
             yield return null;
         }
+        if (task.IsFaulted) throw task.Exception;
+        yield break;
 
+    }
+
+    // Async version of Act() which awaits UI action via TaskCompletionSource
+    private TaskCompletionSource<bool> actionTcs;
+    public async Task ActAsync(ERoundPhase phase)
+    {
+        if (CanAct())
+        {
+            acting = true;
+            current = this;
+            BindUI(phase);
+            actionTcs = new TaskCompletionSource<bool>();
+            if (HumanPlayerUI.Instance != null)
+                HumanPlayerUI.Instance.OnAction += HandlePlayerAction;
+            try
+            {
+                await actionTcs.Task;
+            }
+            finally
+            {
+                if (HumanPlayerUI.Instance != null)
+                    HumanPlayerUI.Instance.OnAction -= HandlePlayerAction;
+                current = null;
+                acting = false;
+            }
+        }
+        else
+        {
+            await Task.Yield();
+        }
     }
 
 
@@ -229,6 +246,12 @@ public class Player
                 }
                 break;
         }
+        // Signal awaiting ActAsync if present
+        try
+        {
+            actionTcs?.TrySetResult(true);
+        }
+        catch { }
         acting = false;
     }
 }

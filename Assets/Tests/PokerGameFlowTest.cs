@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -16,6 +17,16 @@ public class PokerGameFlowTest : MonoBehaviour
     public int numPlayers = 4;
 
     public IEnumerator Run(AIConfig config, int handsToPlay, int numPlayers)
+    {
+        var task = RunAsync(config, handsToPlay, numPlayers);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+        if (task.IsFaulted) throw task.Exception;
+    }
+
+    public async Task RunAsync(AIConfig config, int handsToPlay, int numPlayers)
     {
         Debug.Log("PokerGameFlowTest: starting flow test...");
 
@@ -43,7 +54,7 @@ public class PokerGameFlowTest : MonoBehaviour
         for (int h = 0; h < handsToPlay; h++)
         {
             game.Reset();
-            yield return StartCoroutine(game.StartHandRoutine());
+            await game.StartHandAsync();
             int total = game.players.Sum(p => p.data.Stack);
             if (total != initialTotal)
             {
@@ -54,7 +65,7 @@ public class PokerGameFlowTest : MonoBehaviour
                 Debug.LogWarning($"[OK] After hand {h + 1}: total chips = {total}");
             }
             // 异步点：等待一帧再继续下一手（在 Play 模式下非阻塞）
-            yield return null;
+            await Task.Yield();
         }
 
         Debug.LogWarning("PokerGameFlowTest: finished");

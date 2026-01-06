@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -261,6 +262,20 @@ public class UIManager : MonoBehaviour
 
     }
 
+    // Helper to run an IEnumerator as a Task (keeps execution on Unity main thread via coroutine)
+    private Task RunCoroutineAsTask(System.Collections.IEnumerator routine)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        StartCoroutine(RunCoroutineRoutine(routine, tcs));
+        return tcs.Task;
+    }
+
+    private System.Collections.IEnumerator RunCoroutineRoutine(System.Collections.IEnumerator routine, TaskCompletionSource<bool> tcs)
+    {
+        yield return StartCoroutine(routine);
+        tcs.TrySetResult(true);
+    }
+
 
 
     private IEnumerator FadeInCanvasGroup(CanvasGroup cg, float dur)
@@ -363,6 +378,55 @@ public class UIManager : MonoBehaviour
         }
         yield return new WaitForSeconds(dur);
     }
+
+    // Async wrappers for coroutine-based utilities (preserve main-thread safety)
+    public Task FadeInCanvasGroupAsync(CanvasGroup cg, float dur) => RunCoroutineAsTask(FadeInCanvasGroup(cg, dur));
+    public Task MoveRectToAsync(RectTransform rt, Vector2 target, float dur) => RunCoroutineAsTask(MoveRectTo(rt, target, dur));
+    public Task RotateRectToAsync(RectTransform rt, float targetZ, float dur) => RunCoroutineAsTask(RotateRectTo(rt, targetZ, dur));
+    public Task ArrangePlayersSmoothAsync(List<GameObject> gos, float uiScale, float dur) => RunCoroutineAsTask(ArrangePlayersSmooth(gos, uiScale, dur));
+
+    public Task ShowResultAsync(int pot) => RunCoroutineAsTask(ShowResult(pot));
+    public Task ShowWinnersAsync() => RunCoroutineAsTask(ShowWinners());
+
+    public async Task RunGameWithHiddenSettingsAsync(System.Collections.IEnumerator inner)
+    {
+        SetActiveSafe(paramsContainerGO, false);
+        SetActiveSafe(aiDelayLabel?.gameObject, false);
+        SetActiveSafe(aiDelaySlider?.gameObject, false);
+        SetActiveSafe(startButton?.gameObject, false);
+        SetActiveSafe(dealButton?.gameObject, false);
+
+        // show restart button so user can cancel and return to settings
+        SetActiveSafe(restartButtonGO, true);
+
+        // run inner using wrapper so we can cancel from Restart
+        currentRunFinished = false;
+        currentRunCoroutine = null;
+        if (inner != null)
+        {
+            currentRunCoroutine = CoroutineTracker.Start(this, RunInnerAndMark(inner));
+            while (!currentRunFinished)
+            {
+                await Task.Yield();
+            }
+        }
+
+        // cleanup
+        if (currentRunCoroutine != null)
+        {
+            CoroutineTracker.Stop(this, currentRunCoroutine);
+            currentRunCoroutine = null;
+        }
+
+        SetActiveSafe(restartButtonGO, false);
+        SetActiveSafe(paramsContainerGO, true);
+        SetActiveSafe(aiDelayLabel?.gameObject, true);
+        SetActiveSafe(aiDelaySlider?.gameObject, true);
+        SetActiveSafe(startButton?.gameObject, true);
+        SetActiveSafe(dealButton?.gameObject, true);
+    }
+
+    public Task RunInnerAndMarkAsync(System.Collections.IEnumerator inner) => RunCoroutineAsTask(RunInnerAndMark(inner));
 
 
     void BindPlayer(int idx, Player player)
