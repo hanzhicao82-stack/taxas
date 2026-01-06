@@ -132,7 +132,13 @@ public class Player
         int beforeStackBet = data.Stack;
         int beforeCurrentBet = data.CurrentBet;
         ApplyPayment(pay, game);
-        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        int prevGameCurrent = game.currentBet;
+        if (data.CurrentBet > prevGameCurrent)
+        {
+            int delta = data.CurrentBet - prevGameCurrent;
+            game.currentBet = data.CurrentBet;
+            game.lastRaiseAmount = Math.Max(1, delta);
+        }
         Debug.Log($"P{this.id + 1} BET pay={pay}, stackBefore={beforeStackBet}, stackAfter={data.Stack}, currentBetBefore={beforeCurrentBet}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
         return true;
     }
@@ -142,13 +148,24 @@ public class Player
         int amount = 0;
         if (args != null && args.Length > 0 && args[0] is int)
             amount = (int)args[0];
-        int minRaise = Mathf.Max(1, game.data.BigBlindAmount);
+        // Minimum extra raise should honor both configured minimum (big blind fraction)
+        // and the previous raise amount within the same betting round.
+        int minByConfig = Mathf.Max(1, game.data.BigBlindAmount);
+        int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+        int minRaise = Mathf.Max(minByConfig, minByLastRaise);
         int desiredExtra = Mathf.Max(amount, minRaise);
         int totalPay = Mathf.Min(need + desiredExtra, data.Stack);
         int beforeStackRaise = data.Stack;
         int beforeCB = data.CurrentBet;
+        int prevGameCurrent = game.currentBet;
         ApplyPayment(totalPay, game);
-        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        if (data.CurrentBet > prevGameCurrent)
+        {
+            int delta = data.CurrentBet - prevGameCurrent;
+            game.currentBet = data.CurrentBet;
+            // update lastRaiseAmount to the actual raise delta for subsequent raises
+            game.lastRaiseAmount = Math.Max(1, delta);
+        }
         Debug.Log($"P{this.id + 1} RAISE pay={totalPay}, stackBefore={beforeStackRaise}, stackAfter={data.Stack}, currentBetBefore={beforeCB}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
         return true;
     }
@@ -158,8 +175,14 @@ public class Player
         int payAll = data.Stack;
         int beforeStackAllIn = data.Stack;
         int beforeCBA = data.CurrentBet;
+        int prevGameCurrent = game.currentBet;
         ApplyPayment(payAll, game);
-        if (data.CurrentBet > game.currentBet) game.currentBet = data.CurrentBet;
+        if (data.CurrentBet > prevGameCurrent)
+        {
+            int delta = data.CurrentBet - prevGameCurrent;
+            game.currentBet = data.CurrentBet;
+            game.lastRaiseAmount = Math.Max(1, delta);
+        }
         Debug.Log($"P{this.id + 1} ALLIN pay={payAll}, stackBefore={beforeStackAllIn}, stackAfter={data.Stack}, currentBetBefore={beforeCBA}, currentBetAfter={data.CurrentBet}, totalCommitted={data.TotalCommitted}, gamePot={game?.data.Pot}");
         return true;
     }

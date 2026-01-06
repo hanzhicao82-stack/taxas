@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -46,6 +44,8 @@ public class PokerGame : MonoBehaviour
     public int pot = 0;
     // 本轮的当前最高下注（其他玩家需要跟注到此数）；注意这与每位玩家的 data.CurrentBet 不同
     public int currentBet = 0;
+    // 最近一次加注的最小尺寸（用于确定后续加注的最小额）
+    public int lastRaiseAmount = 0;
 
     private enum Phase
     {
@@ -104,20 +104,7 @@ public class PokerGame : MonoBehaviour
         catch { }
     }
 
-    public System.Collections.IEnumerator StartHandRoutine()
-    {
-        // StartHandRoutine：整手牌的主流程（发牌 -> 逐街下注 -> 摊牌 -> 派彩）
-        // 保留 coroutine 接口，内部委托给 Task-based 实现 StartHandAsync
-        var task = StartHandAsync();
-        while (!task.IsCompleted)
-        {
-            yield return null;
-        }
-        if (task.IsFaulted)
-        {
-            throw task.Exception;
-        }
-    }
+
 
     // Async version of the main hand flow. Use await Task.Yield() where coroutines previously yielded.
     public async Task StartHandAsync()
@@ -331,22 +318,14 @@ public class PokerGame : MonoBehaviour
 
     private int ActivePlayersCountExcludingAllIn() => players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
 
-    private System.Collections.IEnumerator RunBettingRound(ERoundPhase phase, int startIndex)
-    {
-        // RunBettingRound coroutine kept for compatibility; delegates to RunBettingRoundAsync
-        var task = RunBettingRoundAsync(phase, startIndex);
-        while (!task.IsCompleted)
-        {
-            yield return null;
-        }
-        if (task.IsFaulted) throw task.Exception;
 
-    }
 
     // Async implementation of betting round
     private async Task RunBettingRoundAsync(ERoundPhase phase, int startIndex)
     {
         int n = players.Count;
+        // Initialize lastRaiseAmount at start of betting round (at least big blind)
+        lastRaiseAmount = Math.Max(1, data.BigBlindAmount);
         Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}, 起始座位={startIndex + 1}");
         for (int offset = 0; offset < n; offset++)
         {
@@ -407,19 +386,5 @@ public class PokerGame : MonoBehaviour
         return pots;
     }
 
-    public int DetermineWinner()
-    {
-        // DetermineWinner：遍历未弃牌玩家，使用 HandEvaluator.EvaluateBest 比较最佳 5 张手牌分数，
-        // 返回分数最高的玩家索引（若相等则当前实现返回首个达到最高分的索引）。
-        long bestScore = -1; int bestIdx = -1;
-        for (int i = 0; i < players.Count; i++)
-        {
-            var p = players[i]; if (p.data.Folded) continue;
-            var all = new List<Card>(); all.AddRange(p.data.Hole ?? new List<Card>()); all.AddRange(data.Community ?? new List<Card>());
-            long sc = HandEvaluator.EvaluateBest(all);
-            if (sc > bestScore) { bestScore = sc; bestIdx = i; }
-        }
-        return bestIdx;
-    }
 }
 
