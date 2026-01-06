@@ -40,6 +40,10 @@ public class HumanPlayerUI : MonoBehaviour
     public Button callButton;
     public Button checkButton;
     public Button raiseButton;
+    // Optional confirm UI for AllIn when Call would be insufficient
+    public GameObject allinConfirmPanel;
+    public Button allinConfirmButton;
+    public Button allinCancelButton;
 
     // Action callback: action string and optional amount (0 if not used)
     public delegate void PlayerAction(EPlayerAction action, params object[] args);
@@ -59,6 +63,9 @@ public class HumanPlayerUI : MonoBehaviour
         if (callButton != null) callButton.onClick.AddListener(Call);
         if (checkButton != null) checkButton.onClick.AddListener(Check);
         if (raiseButton != null) raiseButton.onClick.AddListener(Raise);
+
+        if (allinConfirmButton != null) allinConfirmButton.onClick.AddListener(ConfirmAllIn);
+        if (allinCancelButton != null) allinCancelButton.onClick.AddListener(CancelAllIn);
 
         if (raiseConfirmButton != null) raiseConfirmButton.onClick.AddListener(ConfirmRaise);
         if (raiseCancelButton != null) raiseCancelButton.onClick.AddListener(CancelRaise);
@@ -287,6 +294,29 @@ public class HumanPlayerUI : MonoBehaviour
         h.seatLabel = seatText;
         h.hintLabel = hintText;
 
+        // All-in confirmation panel (hidden by default)
+        var confirmPanel = new GameObject("AllInConfirm"); confirmPanel.transform.SetParent(root.transform, false);
+        var cRt = confirmPanel.AddComponent<RectTransform>(); cRt.sizeDelta = new Vector2(320, 96);
+        cRt.anchorMin = new Vector2(0.5f, 0); cRt.anchorMax = new Vector2(0.5f, 0); cRt.pivot = new Vector2(0.5f, 0); cRt.anchoredPosition = new Vector2(0, 140);
+        var cImg = confirmPanel.AddComponent<Image>(); cImg.color = new Color(0f, 0f, 0f, 0.9f);
+        var cTxtGo = new GameObject("Text"); cTxtGo.transform.SetParent(confirmPanel.transform, false);
+        var cTxtRt = cTxtGo.AddComponent<RectTransform>(); cTxtRt.anchorMin = new Vector2(0.5f, 0.5f); cTxtRt.anchorMax = new Vector2(0.5f, 0.5f); cTxtRt.sizeDelta = new Vector2(300, 32); cTxtRt.anchoredPosition = new Vector2(0, 16);
+        var cTxt = cTxtGo.AddComponent<Text>(); cTxt.font = font; cTxt.fontSize = 16; cTxt.alignment = TextAnchor.MiddleCenter; cTxt.color = Color.white; cTxt.text = "筹码不足以跟注，是否全下？";
+        var btnRow2 = new GameObject("AllInButtons"); btnRow2.transform.SetParent(confirmPanel.transform, false);
+        var brt2 = btnRow2.AddComponent<RectTransform>(); brt2.sizeDelta = new Vector2(300, 36);
+        var hrow2 = btnRow2.AddComponent<HorizontalLayoutGroup>(); hrow2.spacing = 8; hrow2.childAlignment = TextAnchor.MiddleCenter; hrow2.childForceExpandWidth = false;
+        var confBtn = CreateSmall("全下", Vector2.zero, btnRow2.transform);
+        var cancelBtn = CreateSmall("取消", Vector2.zero, btnRow2.transform);
+        confBtn.GetComponentInChildren<Text>().text = "全下";
+        cancelBtn.GetComponentInChildren<Text>().text = "取消";
+        confBtn.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
+        cancelBtn.GetComponent<Image>().color = new Color(0.6f, 0.1f, 0.1f);
+        confirmPanel.SetActive(false);
+
+        h.allinConfirmPanel = confirmPanel;
+        h.allinConfirmButton = confBtn;
+        h.allinCancelButton = cancelBtn;
+
         return h;
     }
 
@@ -353,6 +383,7 @@ public class HumanPlayerUI : MonoBehaviour
     {
         if (panel != null) panel.SetActive(true);
         if (raisePanel != null) raisePanel.SetActive(false);
+        if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
     }
 
     public void Hide()
@@ -381,12 +412,35 @@ public class HumanPlayerUI : MonoBehaviour
             int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
             if (need > 0 && player.data.Stack < need)
             {
-                ShowHint("筹码不足以跟注：点击 全下 以全下或取消");
-                return;
+                // show confirm panel if available, otherwise fallback to a hint
+                if (allinConfirmPanel != null)
+                {
+                    if (panel != null) panel.SetActive(false);
+                    allinConfirmPanel.SetActive(true);
+                    return;
+                }
+                else
+                {
+                    ShowHint("筹码不足以跟注：点击 全下 以全下或取消");
+                    return;
+                }
             }
         }
         OnAction?.Invoke(EPlayerAction.Call);
         Hide();
+    }
+
+    void ConfirmAllIn()
+    {
+        OnAction?.Invoke(EPlayerAction.AllIn);
+        if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
+        Hide();
+    }
+
+    void CancelAllIn()
+    {
+        if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
+        if (panel != null) panel.SetActive(true);
     }
 
     void Check()
