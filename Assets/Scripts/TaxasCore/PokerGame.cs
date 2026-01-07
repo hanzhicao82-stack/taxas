@@ -353,21 +353,11 @@ public class PokerGame : MonoBehaviour
         // Initialize lastRaiseAmount at start of betting round (at least big blind)
         lastRaiseAmount = Math.Max(1, data.BigBlindAmount);
         Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}, 起始座位={startIndex + 1}");
-        // Unlimited-raise model: keep letting eligible players act until everyone
-        // has matched the currentBet (or is folded/all-in) after the last raise.
-        // We track the number of active actors (not folded, not all-in, stack>0)
-        // and reset the remaining-to-act counter when a raise occurs.
-        int activeActors = players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
-        if (activeActors <= 1)
-        {
-            // Nothing to do (only one player can act)
-            await Task.Yield();
-            return;
-        }
-
-        int remainingToAct = activeActors; // how many still need to respond to the last raise
+        // Single-pass model: each eligible player gets one opportunity to act
+        // in seating order starting at `startIndex`. Raises do not grant
+        // additional immediate turns to earlier players.
         int idx = startIndex;
-        while (remainingToAct > 0)
+        for (int i = 0; i < n; i++)
         {
             Player p = players[idx];
             ui?.HighlightPlayer(idx + 1);
@@ -391,24 +381,17 @@ public class PokerGame : MonoBehaviour
                     // AI fallback currently not implemented here
                 }
 
-                // If the current bet was raised, recompute active actors and
-                // require all other active players to respond.
+                // Raises update currentBet/lastRaiseAmount as before, but
+                // under the single-pass rule we do not reset prior players' turns.
                 if (currentBet > oldCurrent)
                 {
-                    activeActors = players.Count(pp => !pp.data.Folded && !pp.data.AllIn && pp.data.Stack > 0);
-                    // remaining actors = all active actors except the raiser
-                    remainingToAct = Math.Max(0, activeActors - 1);
-                }
-                else
-                {
-                    // one fewer player needed to act before the round ends
-                    remainingToAct = Math.Max(0, remainingToAct - 1);
+                    Debug.Log($"P{idx + 1} raised to {currentBet} (delta {currentBet - oldCurrent})");
                 }
             }
 
             // advance to next seat
             idx = (idx + 1) % n;
-            // safety: if everyone else is folded or all-in, end
+            // safety: if everyone else is folded or all-in, end early
             int stillActive = players.Count(p2 => !p2.data.Folded && !p2.data.AllIn && p2.data.Stack > 0);
             if (stillActive <= 1) break;
         }
