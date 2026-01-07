@@ -197,8 +197,16 @@ public class Player
         {
             int amt = Convert.ToInt32(args[0]);
             if (amt <= 0) return false;
+            bool wasAllIn = data.AllIn;
             data.Stack += amt;
-            Debug.Log($"P{this.id + 1} BuyIn amount={amt}, new stack={data.Stack}");
+            // IMPORTANT: If the player was AllIn when buying, remain marked AllIn
+            // for the remainder of the current betting round. The game's end-of-round
+            // logic will recompute AllIn statuses so the player can act in subsequent rounds.
+            if (wasAllIn)
+            {
+                data.AllIn = true;
+            }
+            Debug.Log($"P{this.id + 1} BuyIn amount={amt}, new stack={data.Stack}, wasAllIn={wasAllIn}");
             return false;
         }
         catch (Exception ex)

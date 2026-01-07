@@ -55,6 +55,24 @@ public class PokerGame : MonoBehaviour
         River,
         Showdown
     }
+
+    // Re-evaluate players' AllIn flags based on current stacks.
+    // This ensures players who purchased chips while previously AllIn
+    // are allowed to act in subsequent betting rounds.
+    private void RecomputeAllInStatuses()
+    {
+        foreach (var p in players)
+        {
+            bool wasAllIn = p.data.AllIn;
+            p.data.AllIn = (p.data.Stack <= 0);
+            if (wasAllIn && !p.data.AllIn)
+            {
+                Debug.Log($"P{p.id + 1} AllIn cleared after round due to stack={p.data.Stack}");
+            }
+        }
+    }
+
+
     private Phase phase;
 
     void Start()
@@ -104,6 +122,129 @@ public class PokerGame : MonoBehaviour
         catch { }
     }
 
+
+    async Task PrePhase(Phase phase)
+    {
+        // Placeholder for any pre-phase setup if needed
+        for (int i = 0; i < players.Count; i++)
+            players[i].data.CurrentBet = 0;
+        data.CurrentBet = 0;
+        currentBet = 0;
+    }
+
+    async Task PostPhase(Phase phase)
+    {
+        // Placeholder for any post-phase cleanup if needed
+        RecomputeAllInStatuses();
+    }
+
+    async Task EnterPhase(Phase phase)
+    {
+        await PrePhase(phase);
+        this.phase = phase;
+        // Main phase logic would go here if needed
+        switch (phase)
+        {
+            case Phase.Preflop:
+                Debug.Log("--- 预翻牌阶段: 开始下注轮 ---");
+                int preflopStart = (data.BigBlindAmount > 0)
+                    ? DealerManager.GetFirstToActAfterBigBlind(dealerIndex, numPlayers)
+                    : DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
+                await RunBettingRoundAsync(ERoundPhase.Preflop, preflopStart);
+                break;
+            case Phase.Flop:
+                deck.Draw(); // burn
+                var flopAdded = new List<Card> { deck.Draw(), deck.Draw(), deck.Draw() };
+                data.Community.AddRange(flopAdded);
+                Debug.Log("--- 翻牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+                GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
+                int postflopStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
+                await RunBettingRoundAsync(ERoundPhase.Flop, postflopStart);
+                break;
+            case Phase.Turn:
+                deck.Draw(); // burn
+                var turnAdded = new List<Card> { deck.Draw() };
+                data.Community.AddRange(turnAdded);  
+                Debug.Log("--- 转牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+                GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
+                int turnStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
+                await RunBettingRoundAsync(ERoundPhase.Turn, turnStart);
+                break;
+            case Phase.River:
+                deck.Draw(); // burn
+                var riverAdded = new List<Card> { deck.Draw() };
+                data.Community.AddRange(riverAdded);              
+                Debug.Log("--- 河牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
+                GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
+                int riverStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
+                await RunBettingRoundAsync(ERoundPhase.River, riverStart);
+                break;
+            case Phase.Showdown:
+                Debug.Log("--- 摊牌与派彩 ---");
+                Debug.Log($"Before CollectPots: players stacks=[{string.Join(",", players.Select(p => $"{p.id}:{p.data.Stack}"))}], currentBets=[{string.Join(",", players.Select(p => p.data.CurrentBet))}]");
+                var pots = CollectPots();
+                // Update the game-level pot value so UI and other systems can read it.
+                try
+                {
+                    int totalPot = pots.Sum(p => p.amount);
+                    data.Pot = totalPot;
+                }
+                catch
+                {
+                    data.Pot = 0;
+                }
+                foreach (var potInfo in pots)
+                {
+                    int amount = potInfo.amount;
+                    var elig = potInfo.eligible;
+                    Debug.Log($"派彩：底池金额={amount}, 有资格的玩家=[{string.Join(",", elig)}]");
+                    long best = -1;
+                    List<int> winners = new List<int>();
+                    foreach (int pid in elig)
+                    {
+                        var p = players[pid];
+                        if (p.data.Folded) continue;
+                        var all = new List<Card>();
+                        all.AddRange(p.data.Hole ?? new List<Card>());
+                        all.AddRange(data.Community ?? new List<Card>());
+                        long sc = HandEvaluator.EvaluateBest(all);
+                        Debug.Log($"计算 P{pid + 1}：手牌=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] 公共牌=[{string.Join(" ", data.Community ?? new List<Card>())}] 得分={sc}");
+                        if (sc > best)
+                        {
+                            best = sc;
+                            winners.Clear(); winners.Add(pid);
+                        }
+                        else if (sc == best)
+                        {
+                            winners.Add(pid);
+                        }
+                    }
+                    if (winners.Count == 0)
+                        continue;
+                    int share = amount / winners.Count;
+                    int remainder = amount - share * winners.Count;
+                    Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}, 余数={remainder}");
+                    for (int idx = 0; idx < winners.Count; idx++)
+                    {
+                        var w = winners[idx];
+                        var pd = players[w].data;
+                        int give = share + (idx < remainder ? 1 : 0);
+                        pd.Stack = pd.Stack + give;
+                        Debug.Log($"发放 P{w + 1} +{give} => 新筹码={pd.Stack}");
+                    }
+                }
+                foreach (var p in players) Debug.LogWarning($"P{p.id + 1} 筹码={p.data.Stack}");
+                if (ui != null)
+                {
+                    await RunCoroutineAsTask(ui.ShowResult(data.Pot));
+                }
+                break;
+            default:
+                break;
+        }
+
+        await PostPhase(phase);
+    }
 
 
     // Async version of the main hand flow. Use await Task.Yield() where coroutines previously yielded.
@@ -155,141 +296,26 @@ public class PokerGame : MonoBehaviour
         PostBlinds();
         GameEventBus.Submit(Events.HandStarted, players.Select(p => p).ToList());
 
-        // Preflop
-        phase = Phase.Preflop;
-        Debug.Log("--- 预翻牌阶段: 开始下注轮 ---");
-        int preflopStart = (data.BigBlindAmount > 0)
-            ? DealerManager.GetFirstToActAfterBigBlind(dealerIndex, numPlayers)
-            : DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-        await RunBettingRoundAsync(ERoundPhase.Preflop, preflopStart);
-
-        // Normalize per-round bet state before progressing to next street:
-        // - players' CurrentBet represent this betting round and should be cleared
-        // - game-level currentBet/data.CurrentBet should be reset to 0 so next street allows Check
-        for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
-        data.CurrentBet = 0;
-        currentBet = 0;
+        // End of preflop cleanup and move into Flop phase
+        await EnterPhase(Phase.Preflop);
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
-            // Flop
-            phase = Phase.Flop;
-            deck.Draw(); // burn
-            var flopAdded = new List<Card> { deck.Draw(), deck.Draw(), deck.Draw() };
-            data.Community.AddRange(flopAdded);
-            data.CurrentBet = 0;
-            Debug.Log("--- 翻牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.Flop, Tuple.Create(data.Community.ToList(), flopAdded));
-            int postflopStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            await RunBettingRoundAsync(ERoundPhase.Flop, postflopStart);
-
-            // clear per-round bets again before next street
-            for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
-            data.CurrentBet = 0;
-            currentBet = 0;
+            await EnterPhase(Phase.Flop);
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
-            // Turn
-            phase = Phase.Turn;
-            deck.Draw(); // burn
-            var turnAdded = new List<Card> { deck.Draw() };
-            data.Community.AddRange(turnAdded);
-            data.CurrentBet = 0;
-            Debug.Log("--- 转牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.Turn, Tuple.Create(data.Community.ToList(), turnAdded));
-            int turnStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            await RunBettingRoundAsync(ERoundPhase.Turn, turnStart);
-
-            // clear per-round bets again before next street
-            for (int i = 0; i < players.Count; i++) players[i].data.CurrentBet = 0;
-            data.CurrentBet = 0;
-            currentBet = 0;
+            await EnterPhase(Phase.Turn);
         }
 
         if (ActivePlayersCountExcludingAllIn() > 0)
         {
-            // River
-            phase = Phase.River;
-            deck.Draw(); // burn
-            var riverAdded = new List<Card> { deck.Draw() };
-            data.Community.AddRange(riverAdded);
-            data.CurrentBet = 0;
-            Debug.Log("--- 河牌: " + string.Join(" ", data.Community.Select(c => c.ToString())) + " ---");
-            GameEventBus.Submit(Events.River, Tuple.Create(data.Community.ToList(), riverAdded));
-            int riverStart = DealerManager.GetFirstToActAfterDealer(dealerIndex, numPlayers);
-            await RunBettingRoundAsync(ERoundPhase.River, riverStart);
-
-            // (Do not clear per-round bets here) — CollectPots() needs the
-            // players' committed `CurrentBet` values to compute side pots.
+            await EnterPhase(Phase.River);
         }
 
-        // Showdown & payout
-        phase = Phase.Showdown;
-        Debug.Log("--- 摊牌与派彩 ---");
-        Debug.Log($"Before CollectPots: players stacks=[{string.Join(",", players.Select(p=>$"{p.id}:{p.data.Stack}"))}], currentBets=[{string.Join(",", players.Select(p=>p.data.CurrentBet))}]");
-        var pots = CollectPots();
+        await EnterPhase(Phase.Showdown);
 
-        // Update the game-level pot value so UI and other systems can read it.
-        try
-        {
-            int totalPot = pots.Sum(p => p.amount);
-            data.Pot = totalPot;
-        }
-        catch
-        {
-            data.Pot = 0;
-        }
-
-
-        foreach (var potInfo in pots)
-        {
-            int amount = potInfo.amount;
-            var elig = potInfo.eligible;
-            Debug.Log($"派彩：底池金额={amount}, 有资格的玩家=[{string.Join(",", elig)}]");
-            long best = -1;
-            List<int> winners = new List<int>();
-            foreach (int pid in elig)
-            {
-                var p = players[pid];
-                if (p.data.Folded) continue;
-                var all = new List<Card>();
-                all.AddRange(p.data.Hole ?? new List<Card>());
-                all.AddRange(data.Community ?? new List<Card>());
-                long sc = HandEvaluator.EvaluateBest(all);
-                Debug.Log($"计算 P{pid + 1}：手牌=[{string.Join(" ", p.data.Hole ?? new List<Card>())}] 公共牌=[{string.Join(" ", data.Community ?? new List<Card>())}] 得分={sc}");
-                if (sc > best)
-                {
-                    best = sc;
-                    winners.Clear(); winners.Add(pid);
-                }
-                else if (sc == best)
-                {
-                    winners.Add(pid);
-                }
-            }
-            if (winners.Count == 0)
-                continue;
-            int share = amount / winners.Count;
-            int remainder = amount - share * winners.Count;
-            Debug.Log($"底池胜者=[{string.Join(",", winners)}], 每人分得={share}, 余数={remainder}");
-            for (int idx = 0; idx < winners.Count; idx++)
-            {
-                var w = winners[idx];
-                var pd = players[w].data;
-                int give = share + (idx < remainder ? 1 : 0);
-                pd.Stack = pd.Stack + give;
-                Debug.Log($"发放 P{w + 1} +{give} => 新筹码={pd.Stack}");
-            }
-        }
-
-        foreach (var p in players) Debug.LogWarning($"P{p.id + 1} 筹码={p.data.Stack}");
-
-        if (ui != null)
-        {
-            await RunCoroutineAsTask(ui.ShowResult(data.Pot));
-        }
         DealerManager.AdvanceDealer(this);
         return;
     }
@@ -419,7 +445,7 @@ public class PokerGame : MonoBehaviour
             p.data.CurrentBet = 0;
             p.data.TotalCommitted = 0;
         }
-        Debug.Log($"CollectPots result: potsAmounts=[{string.Join(",", pots.Select(pp=>pp.amount))}], players CurrentBet and TotalCommitted cleared");
+        Debug.Log($"CollectPots result: potsAmounts=[{string.Join(",", pots.Select(pp => pp.amount))}], players CurrentBet and TotalCommitted cleared");
         return pots;
     }
 
