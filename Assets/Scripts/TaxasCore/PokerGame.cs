@@ -351,116 +351,70 @@ public class PokerGame : MonoBehaviour
     {
         int n = players.Count;
         int idx = startIndex;
-        // Ensure lastRaiseAmount is initialized for all phases to avoid using stale values
+        // Initialize lastRaiseAmount at start of betting round (at least big blind)
         lastRaiseAmount = Math.Max(1, data.BigBlindAmount);
-        if (phase == ERoundPhase.Preflop)
+        Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}, 起始座位={startIndex + 1}");
+        // Unlimited-raise model: keep letting eligible players act until everyone
+        // has matched the currentBet (or is folded/all-in) after the last raise.
+        // We track the number of active actors (not folded, not all-in, stack>0)
+        // and reset the remaining-to-act counter when a raise occurs.
+        int activeActors = players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
+        if (activeActors <= 1)
         {
-            for (int i = 0; i < n; i++)
-            {
-                Player p = players[idx];
-                ui?.HighlightPlayer(idx + 1);
-                Debug.Log($"当前行动玩家: 座位={idx + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
-
-                if (!p.data.Folded && !p.data.AllIn && p.data.Stack > 0)
-                {
-                    int oldCurrent = currentBet;
-                    if (humanUI != null)
-                    {
-                        int need = Math.Max(0, currentBet - p.data.CurrentBet);
-                        bool canOpenBet = (currentBet == 0);
-                        humanUI.ConfigureForNeed(need, canOpenBet);
-                        humanUI.ShowForSeat(idx, phase);
-                        await p.ActAsync(phase);
-                        Debug.Log($"行动后 P{idx + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
-                        await Task.Yield();
-                    }
-                    else
-                    {
-                        // AI fallback currently not implemented here
-                    }
-
-                    // Raises update currentBet/lastRaiseAmount as before, but
-                    // under the single-pass rule we do not reset prior players' turns.
-                    if (currentBet > oldCurrent)
-                    {
-                        Debug.Log($"P{idx + 1} raised to {currentBet} (delta {currentBet - oldCurrent})");
-                    }
-                }
-
-                // advance to next seat
-                idx = (idx + 1) % n;
-                // safety: if everyone else is folded or all-in, end early
-                int stillActive = players.Count(p2 => !p2.data.Folded && !p2.data.AllIn && p2.data.Stack > 0);
-                if (stillActive <= 1) break;
-            }
+            // Nothing to do (only one player can act)
+            await Task.Yield();
+            return;
         }
 
-        else
+        int remainingToAct = activeActors; // how many still need to respond to the last raise
+
+        while (remainingToAct > 0)
         {
+            Player p = players[idx];
+            ui?.HighlightPlayer(idx + 1);
+            Debug.Log($"当前行动玩家: 座位={idx + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
 
-            // Initialize lastRaiseAmount at start of betting round (at least big blind)
-            lastRaiseAmount = Math.Max(1, data.BigBlindAmount);
-            Debug.Log($"运行下注轮: 阶段={phase}, 玩家数={n}, 起始座位={startIndex + 1}");
-            // Unlimited-raise model: keep letting eligible players act until everyone
-            // has matched the currentBet (or is folded/all-in) after the last raise.
-            // We track the number of active actors (not folded, not all-in, stack>0)
-            // and reset the remaining-to-act counter when a raise occurs.
-            int activeActors = players.Count(p => !p.data.Folded && !p.data.AllIn && p.data.Stack > 0);
-            if (activeActors <= 1)
+            if (!p.data.Folded && !p.data.AllIn && p.data.Stack > 0)
             {
-                // Nothing to do (only one player can act)
-                await Task.Yield();
-                return;
-            }
-
-            int remainingToAct = activeActors; // how many still need to respond to the last raise
-
-            while (remainingToAct > 0)
-            {
-                Player p = players[idx];
-                ui?.HighlightPlayer(idx + 1);
-                Debug.Log($"当前行动玩家: 座位={idx + 1}, 名称={p.name}, 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 筹码={p.data.Stack}, 当前下注={p.data.CurrentBet}");
-
-                if (!p.data.Folded && !p.data.AllIn && p.data.Stack > 0)
+                int oldCurrent = currentBet;
+                if (humanUI != null)
                 {
-                    int oldCurrent = currentBet;
-                    if (humanUI != null)
-                    {
-                        int need = Math.Max(0, currentBet - p.data.CurrentBet);
-                        bool canOpenBet = (currentBet == 0);
-                        humanUI.ConfigureForNeed(need, canOpenBet);
-                        humanUI.ShowForSeat(idx, phase);
-                        await p.ActAsync(phase);
-                        Debug.Log($"行动后 P{idx + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
-                        await Task.Yield();
-                    }
-                    else
-                    {
-                        // AI fallback currently not implemented here
-                    }
-
-                    // If the current bet was raised, recompute active actors and
-                    // require all other active players to respond.
-                    if (currentBet > oldCurrent)
-                    {
-                        activeActors = players.Count(pp => !pp.data.Folded && !pp.data.AllIn && pp.data.Stack > 0);
-                        // remaining actors = all active actors except the raiser
-                        remainingToAct = Math.Max(0, activeActors - 1);
-                    }
-                    else
-                    {
-                        // one fewer player needed to act before the round ends
-                        remainingToAct = Math.Max(0, remainingToAct - 1);
-                    }
+                    int need = Mathf.Max(0, currentBet - p.data.CurrentBet);
+                    bool canOpenBet = (currentBet == 0);
+                    humanUI.ConfigureForNeed(need, canOpenBet);
+                    humanUI.ShowForSeat(idx, phase);
+                    await p.ActAsync(phase);
+                    Debug.Log($"行动后 P{idx + 1}: 弃牌={p.data.Folded}, 全下={p.data.AllIn}, 当前下注={p.data.CurrentBet}, 筹码={p.data.Stack}");
+                    await Task.Yield();
+                }
+                else
+                {
+                    // AI fallback currently not implemented here
                 }
 
-                // advance to next seat
-                idx = (idx + 1) % n;
-                // safety: if everyone else is folded or all-in, end
-                int stillActive = players.Count(p2 => !p2.data.Folded && !p2.data.AllIn && p2.data.Stack > 0);
-                if (stillActive <= 1) break;
+                // If the current bet was raised, recompute active actors and
+                // require all other active players to respond.
+                if (currentBet > oldCurrent)
+                {
+                    activeActors = players.Count(pp => !pp.data.Folded && !pp.data.AllIn && pp.data.Stack > 0);
+                    // remaining actors = all active actors except the raiser
+                    remainingToAct = Math.Max(0, activeActors - 1);
+                }
+                else
+                {
+                    // one fewer player needed to act before the round ends
+                    remainingToAct = Math.Max(0, remainingToAct - 1);
+                }
             }
+
+            // advance to next seat
+            idx = (idx + 1) % n;
+            // safety: if everyone else is folded or all-in, end
+            int stillActive = players.Count(p2 => !p2.data.Folded && !p2.data.AllIn && p2.data.Stack > 0);
+            if (stillActive <= 1)
+                break;
         }
+
         await Task.Yield();
     }
 
