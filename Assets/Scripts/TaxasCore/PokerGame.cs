@@ -317,6 +317,7 @@ public class PokerGame : MonoBehaviour
         await EnterPhase(Phase.Showdown);
 
         DealerManager.AdvanceDealer(this);
+        ui.OnEndHand();
         return;
     }
 

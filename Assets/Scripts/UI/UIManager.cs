@@ -558,6 +558,7 @@ public class UIManager : MonoBehaviour
         {
             BindPlayer(i, players[i]);
         }
+        
         // subscribe to per-player data changes and update UI
     }
 
@@ -572,7 +573,10 @@ public class UIManager : MonoBehaviour
     private List<DataSubs> dataSubs = new List<DataSubs>();
 
 
-
+    public void OnEndHand()
+    {
+        communityText.text = "";
+    }
 
     private void UnsubscribeAllPlayerData()
     {
