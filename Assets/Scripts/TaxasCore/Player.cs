@@ -31,6 +31,9 @@ public enum EPlayerAction
     //summary> All-in action (bet all remaining chips). </summary>
     //summary> 全下操作（下注所有剩余筹码）。 </summary>
     AllIn
+    ,
+    // Buy-in / add stack
+    BuyIn
 }
 
 /// <summary>
@@ -187,6 +190,24 @@ public class Player
         return true;
     }
 
+    private bool HandleBuyIn(object[] args)
+    {
+        if (args == null || args.Length == 0) return false;
+        try
+        {
+            int amt = Convert.ToInt32(args[0]);
+            if (amt <= 0) return false;
+            data.Stack += amt;
+            Debug.Log($"P{this.id + 1} BuyIn amount={amt}, new stack={data.Stack}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"BuyIn failed: {ex.Message}");
+            return false;
+        }
+    }
+
     // Async version of Act() which awaits UI action via TaskCompletionSource
     private TaskCompletionSource<bool> actionTcs;
     public async Task ActAsync(ERoundPhase phase)
@@ -271,6 +292,9 @@ public class Player
                 break;
             case EPlayerAction.AllIn:
                 handled = HandleAllIn(game);
+                break;
+            case EPlayerAction.BuyIn:
+                handled = HandleBuyIn(args);
                 break;
         }
         // Only signal completion if the handler actually applied an action

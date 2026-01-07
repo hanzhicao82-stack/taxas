@@ -34,6 +34,14 @@ public class HumanPlayerUI : MonoBehaviour
     public Text betValueLabel;
     public Button betConfirmButton;
     public Button betCancelButton;
+    
+    // Buy-in / add stack UI
+    public GameObject buyPanel;
+    public Slider buySlider;
+    public Text buyValueLabel;
+    public Button buyConfirmButton;
+    public Button buyCancelButton;
+    public Button addStackButton;
 
     public Button allinButton;
     public Button foldButton;
@@ -67,11 +75,16 @@ public class HumanPlayerUI : MonoBehaviour
         if (allinConfirmButton != null) allinConfirmButton.onClick.AddListener(ConfirmAllIn);
         if (allinCancelButton != null) allinCancelButton.onClick.AddListener(CancelAllIn);
 
+        if (addStackButton != null) addStackButton.onClick.AddListener(ShowBuyStack);
+
         if (raiseConfirmButton != null) raiseConfirmButton.onClick.AddListener(ConfirmRaise);
         if (raiseCancelButton != null) raiseCancelButton.onClick.AddListener(CancelRaise);
 
         if (betConfirmButton != null) betConfirmButton.onClick.AddListener(ConfirmBet);
         if (betCancelButton != null) betCancelButton.onClick.AddListener(CancelBet);
+
+        if (buyConfirmButton != null) buyConfirmButton.onClick.AddListener(ConfirmBuyStack);
+        if (buyCancelButton != null) buyCancelButton.onClick.AddListener(CancelBuyStack);
 
         if (raisePanel != null) raisePanel.SetActive(false);
         if (betPanel != null) betPanel.SetActive(false);
@@ -167,12 +180,15 @@ public class HumanPlayerUI : MonoBehaviour
         var callB = makeBtn("Call");
         var checkB = makeBtn("Check");
         var raiseB = makeBtn("Raise");
+        var addStackB = makeBtn("AddStack");
         // Tweak labels and colors
         allinB.GetComponentInChildren<Text>().text = "全下"; allinB.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.1f);
         foldB.GetComponentInChildren<Text>().text = "弃牌"; foldB.GetComponent<Image>().color = new Color(0.8f, 0.1f, 0.1f);
         callB.GetComponentInChildren<Text>().text = "跟注"; callB.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f);
         checkB.GetComponentInChildren<Text>().text = "过牌"; checkB.GetComponent<Image>().color = new Color(0.4f, 0.4f, 0.4f);
         raiseB.GetComponentInChildren<Text>().text = "加注"; raiseB.GetComponent<Image>().color = new Color(0.1f, 0.4f, 0.9f);
+        addStackB.GetComponentInChildren<Text>().text = "买筹"; addStackB.GetComponent<Image>().color = new Color(0.2f, 0.7f, 0.2f);
+        addStackB.onClick.AddListener(() => h.ShowBuyStack());
         seatText.fontSize = 20; seatText.fontStyle = FontStyle.Bold;
         var seatShadow = seatLabelGO.AddComponent<Shadow>(); seatShadow.effectColor = new Color(0f, 0f, 0f, 0.6f); seatShadow.effectDistance = new Vector2(2, -2);
 
@@ -181,7 +197,7 @@ public class HumanPlayerUI : MonoBehaviour
         var rrt = raisePanel.AddComponent<RectTransform>(); rrt.sizeDelta = new Vector2(300, 96);
         rrt.anchorMin = new Vector2(0.5f, 0); rrt.anchorMax = new Vector2(0.5f, 0); rrt.pivot = new Vector2(0.5f, 0); rrt.anchoredPosition = new Vector2(0, 140);
         var rimg = raisePanel.AddComponent<Image>(); rimg.color = new Color(0f, 0f, 0f, 0.75f);
-        var rVlg = raisePanel.AddComponent<VerticalLayoutGroup>(); 
+        var rVlg = raisePanel.AddComponent<VerticalLayoutGroup>();
         rVlg.spacing = 20;
         rVlg.childAlignment = TextAnchor.UpperCenter;
         rVlg.childForceExpandWidth = true;
@@ -250,7 +266,7 @@ public class HumanPlayerUI : MonoBehaviour
         {
             string stack = "";
             if (Player.current != null)
-                stack = Mathf.RoundToInt(v * Player.current.data.Stack).ToString();
+                stack = Mathf.CeilToInt(v * Player.current.data.Stack).ToString();
             bValText.text = Mathf.RoundToInt(v * 100f) + "%" + " (" + stack + " 筹码)";
         });
 
@@ -281,6 +297,7 @@ public class HumanPlayerUI : MonoBehaviour
         h.checkButton = checkB;
 
         h.raiseButton = raiseB;
+        h.addStackButton = addStackB;
         h.raisePanel = raisePanel;
         h.raiseSlider = raiseSlider;
         h.raiseValueLabel = valText;
@@ -291,6 +308,11 @@ public class HumanPlayerUI : MonoBehaviour
         h.betValueLabel = bValText;
         h.betConfirmButton = betConf;
         h.betCancelButton = betCanc;
+        h.buyPanel = null;
+        h.buySlider = null;
+        h.buyValueLabel = null;
+        h.buyConfirmButton = null;
+        h.buyCancelButton = null;
         h.seatLabel = seatText;
         h.hintLabel = hintText;
 
@@ -316,6 +338,41 @@ public class HumanPlayerUI : MonoBehaviour
         h.allinConfirmPanel = confirmPanel;
         h.allinConfirmButton = allinConfBtn;
         h.allinCancelButton = allinCancelBtn;
+
+        // Create simple BuyPanel (slider 1..9999)
+        var buyPanel = new GameObject("BuyPanel"); buyPanel.transform.SetParent(root.transform, false);
+        var buyRt = buyPanel.AddComponent<RectTransform>(); buyRt.sizeDelta = new Vector2(360, 120);
+        buyRt.anchorMin = new Vector2(0.5f, 0); buyRt.anchorMax = new Vector2(0.5f, 0); buyRt.pivot = new Vector2(0.5f, 0); buyRt.anchoredPosition = new Vector2(0, 260);
+        var buyImg = buyPanel.AddComponent<Image>(); buyImg.color = new Color(0f, 0f, 0f, 0.9f);
+        var buyVlg = buyPanel.AddComponent<VerticalLayoutGroup>(); buyVlg.spacing = 10; buyVlg.childAlignment = TextAnchor.UpperCenter; buyVlg.childForceExpandWidth = true; buyVlg.childControlHeight = false;
+        var buyCsf = buyPanel.AddComponent<ContentSizeFitter>(); buyCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        var buySliderGO = GameObject.Instantiate(Resources.Load<GameObject>("Slider"));
+        buySliderGO.transform.SetParent(buyPanel.transform, false);
+        var buySlider = buySliderGO.GetComponent<Slider>();
+        buySlider.wholeNumbers = true;
+        buySlider.minValue = 1;
+        buySlider.maxValue = 9999;
+        buySlider.value = 100;
+        var buyValText = buySliderGO.GetComponentInChildren<Text>(); buyValText.text = "100";
+        buySlider.onValueChanged.AddListener((v) => { buyValText.text = Mathf.RoundToInt(v).ToString(); });
+
+        var buyBtnRow = new GameObject("BuyButtons"); buyBtnRow.transform.SetParent(buyPanel.transform, false);
+        var buyBrt = buyBtnRow.AddComponent<RectTransform>(); buyBrt.sizeDelta = new Vector2(320, 36);
+        var buyHrow = buyBtnRow.AddComponent<HorizontalLayoutGroup>(); buyHrow.spacing = 8; buyHrow.childAlignment = TextAnchor.MiddleCenter; buyHrow.childForceExpandWidth = false;
+        var buyConf = CreateSmall("确定", Vector2.zero, buyBtnRow.transform);
+        var buyCanc = CreateSmall("取消", Vector2.zero, buyBtnRow.transform);
+        buyConf.onClick.AddListener(() => h.ConfirmBuyStack());
+        buyCanc.onClick.AddListener(() => h.CancelBuyStack());
+        buyConf.GetComponentInChildren<Text>().text = "确定"; buyCanc.GetComponentInChildren<Text>().text = "取消";
+        buyConf.GetComponent<Image>().color = new Color(0.1f, 0.6f, 0.1f); buyCanc.GetComponent<Image>().color = new Color(0.6f, 0.1f, 0.1f);
+        buyPanel.SetActive(false);
+
+        h.buyPanel = buyPanel;
+        h.buySlider = buySlider;
+        h.buyValueLabel = buyValText;
+        h.buyConfirmButton = buyConf;
+        h.buyCancelButton = buyCanc;
 
         return h;
     }
@@ -397,6 +454,50 @@ public class HumanPlayerUI : MonoBehaviour
         Hide();
     }
 
+    void ShowBuyStack()
+    {
+        if (buyPanel == null) return;
+        var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+        int maxVal = 9999;
+        if (game != null)
+        {
+            int byBigBlind = Mathf.Max(1, game.data.BigBlindAmount) * 200;
+            int byInitial = 1;
+            if (currentSeat >= 0 && currentSeat < game.players.Count)
+                byInitial = Mathf.Max(1, game.players[currentSeat].data.initialStack);
+            maxVal = Mathf.Max(1, Mathf.Max(byBigBlind, byInitial));
+        }
+        if (buySlider != null)
+        {
+            buySlider.maxValue = maxVal;
+            buySlider.value = Mathf.Clamp(buySlider.value, buySlider.minValue, buySlider.maxValue);
+            if (buyValueLabel != null) buyValueLabel.text = Mathf.RoundToInt(buySlider.value).ToString();
+        }
+        if (panel != null) panel.SetActive(false);
+        buyPanel.SetActive(true);
+    }
+
+    void ConfirmBuyStack()
+    {
+        if (buySlider == null)
+        {
+            if (buyPanel != null) buyPanel.SetActive(false);
+            if (panel != null) panel.SetActive(true);
+            return;
+        }
+        int maxVal = Mathf.RoundToInt(buySlider != null ? buySlider.maxValue : 9999);
+        int amount = Mathf.Clamp(Mathf.RoundToInt(buySlider.value), 1, maxVal);
+        OnAction?.Invoke(EPlayerAction.BuyIn, amount);
+        if (buyPanel != null) buyPanel.SetActive(false);
+        if (panel != null) panel.SetActive(true);
+    }
+
+    void CancelBuyStack()
+    {
+        if (buyPanel != null) buyPanel.SetActive(false);
+        if (panel != null) panel.SetActive(true);
+    }
+
     void Fold()
     {
         OnAction?.Invoke(EPlayerAction.Fold);
@@ -456,31 +557,38 @@ public class HumanPlayerUI : MonoBehaviour
         {
             if (panel != null) panel.SetActive(false);
             raisePanel.SetActive(true);
-            if (raiseSlider != null)
-            {
-                var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
-                int stack = 0; int minAllowed = 1;
-                if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                if (raiseSlider != null)
                 {
-                    stack = game.players[currentSeat].data.Stack;
-                    minAllowed = game.data.BigBlindAmount;
+                    var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                    int stack = 0;
+                    int minAllowed = 1;
+                    if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                    {
+                        var player = game.players[currentSeat];
+                        stack = player.data.Stack;
+                        int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
+                        float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
+                        int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+                        int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+                        int minRaise = Mathf.Max(minByConfig, minByLastRaise);
+                        minAllowed = Mathf.Max(1, need + minRaise);
+                    }
+                    float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
+                    raiseSlider.minValue = minFrac;
+                    raiseSlider.maxValue = 1f;
+                    raiseSlider.value = Mathf.Clamp(raiseSlider.value, minFrac, 1f);
+                    raiseSlider.onValueChanged.RemoveAllListeners();
+                    raiseSlider.onValueChanged.AddListener((v) =>
+                    {
+                        var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                        int s = 0;
+                        if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
+                        int chips = Mathf.CeilToInt(v * s);
+                        if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
+                    });
+                    // initialize label
+                    raiseSlider.onValueChanged.Invoke(raiseSlider.value);
                 }
-                float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
-                raiseSlider.minValue = minFrac;
-                raiseSlider.maxValue = 1f;
-                raiseSlider.value = Mathf.Clamp(raiseSlider.value, minFrac, 1f);
-                raiseSlider.onValueChanged.RemoveAllListeners();
-                raiseSlider.onValueChanged.AddListener((v) =>
-                {
-                    var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
-                    int s = 0;
-                    if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
-                    int chips = Mathf.RoundToInt(v * s);
-                    if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
-                });
-                // initialize label
-                raiseSlider.onValueChanged.Invoke(raiseSlider.value);
-            }
         }
         else
         {
@@ -539,7 +647,7 @@ public class HumanPlayerUI : MonoBehaviour
         {
             var player = game.players[currentSeat];
             int stack = player.data.Stack;
-            amount = Mathf.RoundToInt(raiseSlider.value * stack);
+            amount = Mathf.CeilToInt(raiseSlider.value * stack);
             // compute required minimum based on need + minRaise
             int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
             float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
@@ -561,11 +669,16 @@ public class HumanPlayerUI : MonoBehaviour
         if (betSlider != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
         {
             int stack = game.players[currentSeat].data.Stack;
-            amount = Mathf.RoundToInt(betSlider.value * stack);
+            amount = Mathf.CeilToInt(betSlider.value * stack);
             int bigBlind = Mathf.Max(1, game.data.BigBlindAmount);
-            int minAllowed = Mathf.Max(bigBlind, 1);
-            // Quantize amount to multiples of big blind (floor to avoid exceeding stack)
-            int multiples = Mathf.Max(1, Mathf.FloorToInt((float)amount / bigBlind));
+            float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
+            int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+            int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+            int minRaise = Mathf.Max(minByConfig, minByLastRaise);
+            int minAllowed = Mathf.Max(bigBlind, minRaise);
+            // Ensure amount meets the minimum by rounding up to the next multiple of big blind
+            int required = Mathf.Max(amount, minAllowed);
+            int multiples = Mathf.Max(1, Mathf.CeilToInt((float)required / bigBlind));
             amount = multiples * bigBlind;
             amount = Mathf.Clamp(amount, minAllowed, stack);
         }
@@ -599,12 +712,18 @@ public class HumanPlayerUI : MonoBehaviour
                 var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
                 int stack = 0;
                 int bigBlind = 1;
+                int minAllowed = 1;
                 if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
                 {
                     stack = game.players[currentSeat].data.Stack;
                     bigBlind = Mathf.Max(1, game.data.BigBlindAmount);
+                    float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
+                    int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+                    int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+                    int minRaise = Mathf.Max(minByConfig, minByLastRaise);
+                    minAllowed = Mathf.Max(bigBlind, minRaise);
                 }
-                float minFrac = (stack > 0) ? Mathf.Clamp01((float)bigBlind / Mathf.Max(1, stack)) : 0f;
+                float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
                 betSlider.minValue = minFrac;
                 betSlider.maxValue = 1f;
                 betSlider.value = Mathf.Clamp(betSlider.value, minFrac, 1f);
@@ -613,7 +732,7 @@ public class HumanPlayerUI : MonoBehaviour
                 {
                     int s = stack;
                     if (game != null && currentSeat >= 0 && currentSeat < game.players.Count) s = game.players[currentSeat].data.Stack;
-                    int chips = Mathf.RoundToInt(v * s);
+                    int chips = Mathf.CeilToInt(v * s);
                     if (betValueLabel != null) betValueLabel.text = Mathf.RoundToInt(v * 100f) + "%" + " 投注(" + chips + ")";
                 });
                 // initialize label
