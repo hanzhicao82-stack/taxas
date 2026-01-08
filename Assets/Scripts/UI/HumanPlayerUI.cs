@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using System.Threading.Tasks;
 using UnityEngine.UI;
@@ -34,7 +35,7 @@ public class HumanPlayerUI : MonoBehaviour
     public Text betValueLabel;
     public Button betConfirmButton;
     public Button betCancelButton;
-    
+
     // Buy-in / add stack UI
     public GameObject buyPanel;
     public Slider buySlider;
@@ -403,7 +404,15 @@ public class HumanPlayerUI : MonoBehaviour
                     break;
             }
         }
-        Show();
+
+        if (phase != ERoundPhase.Preflop)
+        {
+            Show();
+            // Update available buttons based on player state
+            var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+            if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
+                UpdateButtons(game.players[currentSeat], game);
+        }
     }
 
     // Configure which actions are available given the current need to call.
@@ -438,7 +447,8 @@ public class HumanPlayerUI : MonoBehaviour
 
     public void Show()
     {
-        if (panel != null) panel.SetActive(true);
+        if (panel != null)
+            panel.SetActive(true);
         if (raisePanel != null) raisePanel.SetActive(false);
         if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
     }
@@ -482,20 +492,24 @@ public class HumanPlayerUI : MonoBehaviour
         if (buySlider == null)
         {
             if (buyPanel != null) buyPanel.SetActive(false);
-            if (panel != null) panel.SetActive(true);
+            if (panel != null)
+                panel.SetActive(true);
             return;
         }
         int maxVal = Mathf.RoundToInt(buySlider != null ? buySlider.maxValue : 9999);
         int amount = Mathf.Clamp(Mathf.RoundToInt(buySlider.value), 1, maxVal);
         OnAction?.Invoke(EPlayerAction.BuyIn, amount);
+        UpdateButtons(UnityEngine.Object.FindObjectOfType<PokerGame>()?.players[currentSeat], UnityEngine.Object.FindObjectOfType<PokerGame>());
         if (buyPanel != null) buyPanel.SetActive(false);
-        if (panel != null) panel.SetActive(true);
+        if (panel != null)
+            panel.SetActive(true);
     }
 
     void CancelBuyStack()
     {
         if (buyPanel != null) buyPanel.SetActive(false);
-        if (panel != null) panel.SetActive(true);
+        if (panel != null)
+            panel.SetActive(true);
     }
 
     void Fold()
@@ -534,6 +548,7 @@ public class HumanPlayerUI : MonoBehaviour
     void ConfirmAllIn()
     {
         OnAction?.Invoke(EPlayerAction.AllIn);
+        UpdateButtons(UnityEngine.Object.FindObjectOfType<PokerGame>()?.players[currentSeat], UnityEngine.Object.FindObjectOfType<PokerGame>());
         if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
         Hide();
     }
@@ -541,7 +556,8 @@ public class HumanPlayerUI : MonoBehaviour
     void CancelAllIn()
     {
         if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
-        if (panel != null) panel.SetActive(true);
+        if (panel != null)
+            panel.SetActive(true);
     }
 
     void Check()
@@ -557,38 +573,38 @@ public class HumanPlayerUI : MonoBehaviour
         {
             if (panel != null) panel.SetActive(false);
             raisePanel.SetActive(true);
-                if (raiseSlider != null)
+            if (raiseSlider != null)
+            {
+                var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                int stack = 0;
+                int minAllowed = 1;
+                if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
                 {
-                    var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
-                    int stack = 0;
-                    int minAllowed = 1;
-                    if (game != null && currentSeat >= 0 && currentSeat < game.players.Count)
-                    {
-                        var player = game.players[currentSeat];
-                        stack = player.data.Stack;
-                        int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
-                        float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
-                        int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
-                        int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
-                        int minRaise = Mathf.Max(minByConfig, minByLastRaise);
-                        minAllowed = Mathf.Max(1, need + minRaise);
-                    }
-                    float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
-                    raiseSlider.minValue = minFrac;
-                    raiseSlider.maxValue = 1f;
-                    raiseSlider.value = Mathf.Clamp(raiseSlider.value, minFrac, 1f);
-                    raiseSlider.onValueChanged.RemoveAllListeners();
-                    raiseSlider.onValueChanged.AddListener((v) =>
-                    {
-                        var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
-                        int s = 0;
-                        if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
-                        int chips = Mathf.CeilToInt(v * s);
-                        if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
-                    });
-                    // initialize label
-                    raiseSlider.onValueChanged.Invoke(raiseSlider.value);
+                    var player = game.players[currentSeat];
+                    stack = player.data.Stack;
+                    int need = Mathf.Max(0, game.currentBet - player.data.CurrentBet);
+                    float minRaiseFrac = (game.aiConfig != null) ? game.aiConfig.minRaiseFraction : 1f;
+                    int minByConfig = Mathf.Max(1, Mathf.FloorToInt(game.data.BigBlindAmount * minRaiseFrac));
+                    int minByLastRaise = Mathf.Max(1, game.lastRaiseAmount);
+                    int minRaise = Mathf.Max(minByConfig, minByLastRaise);
+                    minAllowed = Mathf.Max(1, need + minRaise);
                 }
+                float minFrac = (stack > 0) ? Mathf.Clamp01((float)minAllowed / Mathf.Max(1, stack)) : 0f;
+                raiseSlider.minValue = minFrac;
+                raiseSlider.maxValue = 1f;
+                raiseSlider.value = Mathf.Clamp(raiseSlider.value, minFrac, 1f);
+                raiseSlider.onValueChanged.RemoveAllListeners();
+                raiseSlider.onValueChanged.AddListener((v) =>
+                {
+                    var g = UnityEngine.Object.FindObjectOfType<PokerGame>();
+                    int s = 0;
+                    if (g != null && currentSeat >= 0 && currentSeat < g.players.Count) s = g.players[currentSeat].data.Stack;
+                    int chips = Mathf.CeilToInt(v * s);
+                    if (raiseValueLabel != null) raiseValueLabel.text = Mathf.RoundToInt(v * 100f) + "% (" + chips + ")";
+                });
+                // initialize label
+                raiseSlider.onValueChanged.Invoke(raiseSlider.value);
+            }
         }
         else
         {
@@ -658,6 +674,7 @@ public class HumanPlayerUI : MonoBehaviour
             amount = Mathf.Clamp(amount, minAllowed, stack);
         }
         OnAction?.Invoke(EPlayerAction.Raise, amount);
+        UpdateButtons(game.players[currentSeat], game);
         if (raisePanel != null) raisePanel.SetActive(false);
         if (panel != null) panel.SetActive(false);
     }
@@ -683,14 +700,19 @@ public class HumanPlayerUI : MonoBehaviour
             amount = Mathf.Clamp(amount, minAllowed, stack);
         }
         OnAction?.Invoke(EPlayerAction.Bet, amount == 0 ? 0 : amount);
-        if (betPanel != null) betPanel.SetActive(false);
-        if (panel != null) panel.SetActive(false);
+        UpdateButtons(game.players[currentSeat], game);
+        if (betPanel != null)
+            betPanel.SetActive(false);
+        if (panel != null)
+            panel.SetActive(false);
     }
 
     void CancelBet()
     {
-        if (betPanel != null) betPanel.SetActive(false);
-        if (panel != null) panel.SetActive(true);
+        // if (betPanel != null)
+        //     betPanel.SetActive(false);
+        // if (panel != null)
+        //     panel.SetActive(true);
     }
 
     void CancelRaise()
@@ -747,5 +769,42 @@ public class HumanPlayerUI : MonoBehaviour
     {
         betPanel.SetActive(false);
         panel.SetActive(true);
+    }
+
+    // Update which buttons are visible/interactable based on the player's valid next actions.
+    // Uses Rule.GetValiedAtion(player, game) to determine allowed actions.
+    public void UpdateButtons(Player player, PokerGame game)
+    {
+        if (panel == null) return;
+
+        // Determine allowed actions from rules
+        var allowed = new HashSet<EPlayerAction>(Rule.GetValiedAtion(player, game));
+
+        // Helper to set button active and interactable
+        void Set(Button btn, EPlayerAction act)
+        {
+            if (btn == null) return;
+            bool ok = allowed.Contains(act);
+            btn.gameObject.SetActive(ok);
+            btn.interactable = ok;
+        }
+
+        // Map actions to buttons
+        Set(allinButton, EPlayerAction.AllIn);
+        Set(foldButton, EPlayerAction.Fold);
+        Set(callButton, EPlayerAction.Call);
+        Set(checkButton, EPlayerAction.Check);
+        Set(raiseButton, EPlayerAction.Raise);
+        Set(addStackButton, EPlayerAction.BuyIn);
+
+        // If Bet action is allowed but there's no dedicated Bet button, show the Raise button as the entry
+        if (allowed.Contains(EPlayerAction.Bet) && raiseButton != null && !raiseButton.gameObject.activeSelf)
+        {
+            raiseButton.gameObject.SetActive(true);
+            raiseButton.interactable = true;
+        }
+
+        // Ensure panel is visible when there are actions
+        panel.SetActive(allowed.Count > 0);
     }
 }
