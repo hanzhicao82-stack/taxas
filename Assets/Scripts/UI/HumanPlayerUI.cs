@@ -489,6 +489,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void ConfirmBuyStack()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.ConfirmBuyStack(); return; }
         if (buySlider == null)
         {
             if (buyPanel != null) buyPanel.SetActive(false);
@@ -507,6 +508,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void CancelBuyStack()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.CancelBuyStack(); return; }
         if (buyPanel != null) buyPanel.SetActive(false);
         if (panel != null)
             panel.SetActive(true);
@@ -547,6 +549,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void ConfirmAllIn()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.ConfirmAllIn(); return; }
         OnAction?.Invoke(EPlayerAction.AllIn);
         UpdateButtons(UnityEngine.Object.FindObjectOfType<PokerGame>()?.players[currentSeat], UnityEngine.Object.FindObjectOfType<PokerGame>());
         if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
@@ -555,6 +558,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void CancelAllIn()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.CancelAllIn(); return; }
         if (allinConfirmPanel != null) allinConfirmPanel.SetActive(false);
         if (panel != null)
             panel.SetActive(true);
@@ -657,6 +661,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void ConfirmRaise()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.ConfirmRaise(); return; }
         int amount = 0;
         var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
         if (raiseSlider != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
@@ -681,6 +686,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void ConfirmBet()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.ConfirmBet(); return; }
         int amount = 0;
         var game = UnityEngine.Object.FindObjectOfType<PokerGame>();
         if (betSlider != null && game != null && currentSeat >= 0 && currentSeat < game.players.Count)
@@ -709,6 +715,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void CancelBet()
     {
+        if (UICtrl.Instance != null) { UICtrl.Instance.CancelBet(); return; }
         OnAction?.Invoke(EPlayerAction.Bet, 0);
         // if (betPanel != null)
         //     betPanel.SetActive(false);
