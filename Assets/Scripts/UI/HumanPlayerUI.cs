@@ -709,6 +709,7 @@ public class HumanPlayerUI : MonoBehaviour
 
     void CancelBet()
     {
+        OnAction?.Invoke(EPlayerAction.Bet, 0);
         // if (betPanel != null)
         //     betPanel.SetActive(false);
         // if (panel != null)

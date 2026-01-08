@@ -250,8 +250,7 @@ public class Player
 
     bool CanAct()
     {
-        // Player may act if not folded, not already all-in and has chips.
-        return !data.Folded && !data.AllIn && data.Stack > 0;
+        return Rule.GetValiedAtion(this, UnityEngine.Object.FindObjectOfType<PokerGame>()).Length > 0;
     }
 
 
