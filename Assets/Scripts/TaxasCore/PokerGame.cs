@@ -80,32 +80,11 @@ public class PokerGame : MonoBehaviour
 
     }
 
-    // CreateHumanPlayerUI moved to HumanPlayerUI.CreateHumanPlayerUI()
 
-
-
-    public void StopTrackedCoroutine(Coroutine c)
-    {
-        if (c == null) return;
-        try { StopCoroutine(c); } catch { }
-        trackedCoroutines.Remove(c);
-    }
-
-    public void StopAllTrackedCoroutines()
-    {
-        foreach (var c in trackedCoroutines.ToList())
-        {
-            if (c != null)
-            {
-                try { StopCoroutine(c); } catch { }
-            }
-        }
-        trackedCoroutines.Clear();
-    }
 
     private void OnDestroy()
     {
-        StopAllTrackedCoroutines();
+
     }
 
 
@@ -393,17 +372,28 @@ public class PokerGame : MonoBehaviour
                     // AI fallback currently not implemented here
                 }
 
-                // If the current bet was raised, recompute active actors and
-                // require all other active players to respond.
+                // 判断本次玩家行动是否改变了 `currentBet`。
+                // - `oldCurrent` 表示此玩家行动之前的 `currentBet` 值。
+                // - 玩家行动后 `currentBet` 可能增加（发生加注或等效加注）。
+                // 如果当前注增加，其他有资格的玩家必须有机会对新的更高下注做出回应；
+                // 否则，剩余需要行动的人数仅减少 1，因为该玩家已完成对上一次加注的回应。
+                //
+                // 变量说明：
+                // - activeActors：仍然有资格主动响应的玩家数量（未弃牌、未全下且筹码>0）。
+                // - remainingToAct：在本轮结束前仍需行动/回应的玩家数量（发生加注时会重置）。
+                //
+                // 当发生加注时，将 `remainingToAct` 重置为 `activeActors - 1`，因为加注者已经行动，
+                // 其余活跃玩家需要对新的下注作出回应。使用 `Math.Max(0, ...)` 防止在极端情况下出现负值。
                 if (currentBet > oldCurrent)
                 {
+                    // 在加注后重新计算可响应的玩家（有些玩家可能已弃牌或已全下）
                     activeActors = players.Count(pp => !pp.data.Folded && !pp.data.AllIn && pp.data.Stack > 0);
-                    // remaining actors = all active actors except the raiser
+                    // 剩余需要行动的人数 = 除加注者以外的所有活跃玩家
                     remainingToAct = Math.Max(0, activeActors - 1);
                 }
                 else
                 {
-                    // one fewer player needed to act before the round ends
+                    // 未发生加注：该玩家已完成对上一次加注的回应，剩余需要回应的人数减 1
                     remainingToAct = Math.Max(0, remainingToAct - 1);
                 }
             }
